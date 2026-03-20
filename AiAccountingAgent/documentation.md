@@ -1,0 +1,1 @@
+write what we have tried that have not worked, so we do not make the same mistake again
