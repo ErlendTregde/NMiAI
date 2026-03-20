@@ -19,7 +19,7 @@ if _env_file.exists():
 # ── Gemini / Vertex AI ────────────────────────────────────────────────────────
 USE_VERTEX_AI: bool = os.environ.get("USE_VERTEX_AI", "false").lower() == "true"
 GOOGLE_CLOUD_PROJECT: str = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
-VERTEX_AI_LOCATION: str = os.environ.get("VERTEX_AI_LOCATION", "europe-west1")
+VERTEX_AI_LOCATION: str = os.environ.get("VERTEX_AI_LOCATION", "us-central1")
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
 # Model to use for the main reasoning + tool-calling loop
