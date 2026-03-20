@@ -23,9 +23,9 @@ VERTEX_AI_LOCATION: str = os.environ.get("VERTEX_AI_LOCATION", "us-central1")
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
 # Model to use for the main reasoning + tool-calling loop
-GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-2.5-pro")
 # Lighter model for file extraction only
-GEMINI_FLASH_MODEL: str = os.environ.get("GEMINI_FLASH_MODEL", "gemini-2.0-flash")
+GEMINI_FLASH_MODEL: str = os.environ.get("GEMINI_FLASH_MODEL", "gemini-2.5-flash")
 
 # ── Agent behaviour ───────────────────────────────────────────────────────────
 # Hard cap on tool-call iterations per solve request
