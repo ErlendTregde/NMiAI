@@ -103,18 +103,28 @@ def test_gemini() -> JSONResponse:
                 last_error = str(e)
                 continue
 
+        # List available models regardless of above outcome
+        available = []
+        try:
+            for m in client.models.list():
+                available.append(m.name)
+        except Exception as e:
+            available = [f"list_error: {e}"]
+
         if working_model:
             return JSONResponse({
                 "success": True,
                 "working_model": working_model,
-                "configured_model": config.GEMINI_MODEL,
                 "response": response.text,
+                "available_models": available[:20],
             })
         else:
             return JSONResponse({
                 "success": False,
-                "error": last_error,
                 "tried": candidates,
+                "last_error": last_error,
+                "available_models": available[:20],
+                "key_prefix": config.GEMINI_API_KEY[:8] + "..." if config.GEMINI_API_KEY else "NOT SET",
             })
     except Exception as exc:
         return JSONResponse({
