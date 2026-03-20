@@ -8,3 +8,13 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Dataset (926 MB — download directly on training server)
+data/
+
+# Training outputs
+runs/
+dataset/
+*.onnx
+*.pt
+sample_predictions.json
