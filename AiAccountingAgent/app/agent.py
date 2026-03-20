@@ -67,7 +67,7 @@ CRITICAL RULES (every violation reduces your score):
 
 7. EMPLOYEE ROLES: If an employee should be 'kontoadministrator' or 'administrator', \
    this is worth many scoring points. After creating the employee, use \
-   tripletex_api_call to grant the role (e.g. PUT /employee/{id}/loggedInUser).
+   tripletex_api_call to grant the role (e.g. PUT /employee/{{id}}/loggedInUser).
 
 8. TODAY'S DATE: {today}
 
@@ -75,9 +75,9 @@ COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
-• Register payment → POST /invoice/{id}/:payment
-• Delete travel expense → GET /travelExpense → DELETE /travelExpense/{id}
-• Update entity → GET /{resource}/{id} (for version) → PUT /{resource}/{id}
+• Register payment → POST /invoice/{{id}}/:payment
+• Delete travel expense → GET /travelExpense → DELETE /travelExpense/{{id}}
+• Update entity → GET /{{resource}}/{{id}} (for version) → PUT /{{resource}}/{{id}}
 """
 
 
