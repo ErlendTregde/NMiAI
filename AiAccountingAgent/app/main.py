@@ -81,28 +81,47 @@ def test_gemini() -> JSONResponse:
     from .agent import _build_gemini_client
     try:
         client = _build_gemini_client()
-        response = client.models.generate_content(
-            model=config.GEMINI_MODEL,
-            contents="Reply with the single word: working",
-        )
-        return JSONResponse({
-            "success": True,
-            "model": config.GEMINI_MODEL,
-            "use_vertex_ai": config.USE_VERTEX_AI,
-            "project": config.GOOGLE_CLOUD_PROJECT,
-            "location": config.VERTEX_AI_LOCATION,
-            "response": response.text,
-        })
+        # Try models in order of preference until one works
+        candidates = [
+            "gemini-2.5-pro-preview-03-25",
+            "gemini-2.5-flash-preview-04-17",
+            "gemini-2.0-flash-001",
+            "gemini-1.5-pro-latest",
+            "gemini-1.5-flash-latest",
+        ]
+        working_model = None
+        last_error = None
+        for model in candidates:
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents="Reply with the single word: working",
+                )
+                working_model = model
+                break
+            except Exception as e:
+                last_error = str(e)
+                continue
+
+        if working_model:
+            return JSONResponse({
+                "success": True,
+                "working_model": working_model,
+                "configured_model": config.GEMINI_MODEL,
+                "response": response.text,
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "error": last_error,
+                "tried": candidates,
+            })
     except Exception as exc:
         return JSONResponse({
             "success": False,
-            "model": config.GEMINI_MODEL,
-            "use_vertex_ai": config.USE_VERTEX_AI,
-            "project": config.GOOGLE_CLOUD_PROJECT,
-            "location": config.VERTEX_AI_LOCATION,
             "error": str(exc),
             "error_type": type(exc).__name__,
-        }, status_code=200)
+        })
 
 
 @app.middleware("http")
