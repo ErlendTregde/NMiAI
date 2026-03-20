@@ -128,6 +128,9 @@ def run_agent(
     gen_config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         tools=[TOOLS],
+        tool_config=types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(mode="AUTO")
+        ),
     )
 
     logger.info(
@@ -160,16 +163,19 @@ def run_agent(
 
         model_content = response.candidates[0].content
 
-        # Collect all function calls from this response
-        function_calls = [
-            part.function_call
-            for part in model_content.parts
-            if part.function_call is not None
-        ]
+        # Use SDK shortcut which handles thinking tokens and mixed parts correctly
+        function_calls = response.function_calls or []
+
+        # Log what the model said (text parts) for debugging
+        for part in (model_content.parts or []):
+            if hasattr(part, "text") and part.text:
+                logger.info(f"Model text: {part.text[:300]}")
 
         if not function_calls:
-            # Model is done — no more tool calls requested
-            logger.info(f"Agent finished after {iteration + 1} Gemini call(s).")
+            logger.info(
+                f"Agent finished after {iteration + 1} Gemini call(s) — "
+                f"no tool calls in response."
+            )
             break
 
         # Add the model's response to conversation history
@@ -183,12 +189,7 @@ def run_agent(
                 break
             result = execute_tool(tripletex_client, fc.name, dict(fc.args))
             result_parts.append(
-                types.Part(
-                    function_response=types.FunctionResponse(
-                        name=fc.name,
-                        response=result,
-                    )
-                )
+                types.Part.from_function_response(name=fc.name, response=result)
             )
 
         # Feed all tool results back in a single user turn
