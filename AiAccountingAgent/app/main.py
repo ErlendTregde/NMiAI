@@ -74,6 +74,37 @@ def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
+@app.get("/test")
+def test_gemini() -> JSONResponse:
+    """Debug endpoint — tests Gemini connectivity and returns the exact error if any."""
+    from . import config
+    from .agent import _build_gemini_client
+    try:
+        client = _build_gemini_client()
+        response = client.models.generate_content(
+            model=config.GEMINI_MODEL,
+            contents="Reply with the single word: working",
+        )
+        return JSONResponse({
+            "success": True,
+            "model": config.GEMINI_MODEL,
+            "use_vertex_ai": config.USE_VERTEX_AI,
+            "project": config.GOOGLE_CLOUD_PROJECT,
+            "location": config.VERTEX_AI_LOCATION,
+            "response": response.text,
+        })
+    except Exception as exc:
+        return JSONResponse({
+            "success": False,
+            "model": config.GEMINI_MODEL,
+            "use_vertex_ai": config.USE_VERTEX_AI,
+            "project": config.GOOGLE_CLOUD_PROJECT,
+            "location": config.VERTEX_AI_LOCATION,
+            "error": str(exc),
+            "error_type": type(exc).__name__,
+        }, status_code=200)
+
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     t0 = time.time()
