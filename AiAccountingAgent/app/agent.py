@@ -120,6 +120,8 @@ Chain: customer → product → order → invoice → [send] → [payment]
 ═══ VOUCHERS (manual bookings) ═══
 • ALWAYS use tripletex_create_voucher — NEVER use tripletex_api_call for vouchers \
   (api_call does NOT set row numbers, causing "guiRow 0" 422 errors).
+• CHART OF ACCOUNTS IS PRE-POPULATED — NEVER create accounts (POST /ledger/account). \
+  All standard Norwegian accounts (1xxx-9xxx) already exist. Use tripletex_list_accounts to find them.
 • FORBIDDEN accounts (system-protected, cause 422): 1920, 1900, 1500, 2700-2709.
 • Account 2400 (AP/leverandørgjeld): ALLOWED but requires supplier_id on the posting.
 • Employee expenses: include employee_id on expense postings when task involves an employee.
@@ -175,12 +177,16 @@ Chain: customer → product → order → invoice → [send] → [payment]
 
 ═══ API RULES ═══
 • Paths: NEVER prefix with /v2/. Use /employee NOT /v2/employee.
+• NEVER CREATE ACCOUNTS: POST /ledger/account is FORBIDDEN. Accounts are pre-populated. \
+  Use tripletex_list_accounts to find them.
 • NON-EXISTENT ENDPOINTS (cause 404/422 — NEVER use these): \
   /invoice/{{id}}/payment, /invoice/payment, /employee/{{id}}/loggedInUser, \
   /employee/employment/employmentDetails, /v2/ledger/account, /v2/currency.
 • Listing: invoices require invoiceDateFrom + invoiceDateTo.
 • Invalid list fields: dueDate, isPaid, amountOutstanding (cause 400).
 • Ledger postings: do NOT request account.number (causes 400).
+• Voucher fields syntax: use fields like "id,date,description,postings" (flat). \
+  NEVER use nested syntax like "postings{{account{{id" — it causes 400.
 • Product numbers: ONLY set if task explicitly provides one.
 • Order price via api_call: field is unitPriceExcludingVatCurrency.
 • On 403: session expired, STOP immediately.

@@ -531,13 +531,13 @@ _DECLARATIONS = [
         name="tripletex_list_accounts",
         description=(
             "List chart-of-accounts entries (ledger accounts). "
-            "The 'number' field supports PREFIX matching: number=65 returns all 65xx accounts, "
-            "number=12 returns all 12xx accounts. Use 2-digit prefixes for range-like searches. "
-            "Examples: number=65 for office/equipment expenses, number=69 for telecom, "
-            "number=71 for travel, number=12 for asset/depreciation accounts."
+            "All accounts are PRE-POPULATED — never create accounts. "
+            "Supports PREFIX search: number=65 returns all 65xx accounts, "
+            "number=12 returns all 12xx. Omit number to get ALL accounts. "
+            "Call ONCE with the right prefix — do not repeat searches."
         ),
         parameters=_obj({
-            "number": _s("Account number or 2-digit prefix for range search (e.g. '65' returns all 65xx accounts)"),
+            "number": _s("Account number prefix (e.g. '65' for all 65xx accounts). Omit to get all accounts."),
             "fields": _s("Fields to return, e.g. 'id,number,name'"),
         }),
     ),
@@ -1139,11 +1139,21 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Ledger ────────────────────────────────────────────────────────────
 
         case "tripletex_list_accounts":
-            return client.get("/ledger/account", params=_none_stripped({
-                "number": args.get("number"),
-                "fields": args.get("fields", "id,number,name,description"),
-                "count": 100,
-            }))
+            # The Tripletex API 'number' param does EXACT matching only.
+            # To support prefix/range searches, we fetch all accounts and
+            # filter in Python.
+            result = client.get("/ledger/account", params={
+                "fields": args.get("fields", "id,number,name"),
+                "count": 1000,
+            })
+            number_filter = args.get("number")
+            if number_filter and result and "values" in result:
+                prefix = str(number_filter)
+                result["values"] = [
+                    a for a in result["values"]
+                    if str(a.get("number", "")).startswith(prefix)
+                ]
+            return result
 
         case "tripletex_list_vouchers":
             return client.get("/ledger/voucher", params={
@@ -1186,6 +1196,17 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             path = args["path"]
             params = args.get("params") or {}
             body = args.get("body") or {}
+
+            # BLOCK POST /ledger/account — accounts are pre-populated in the
+            # chart of accounts and must NEVER be created via the API.
+            if method == "POST" and "/ledger/account" in path:
+                raise TripletexError(
+                    422,
+                    "STOP: You must NEVER create ledger accounts. The chart of accounts is "
+                    "pre-populated in every Tripletex sandbox. Use tripletex_list_accounts "
+                    "to find existing accounts. Search without a number filter to see all "
+                    "accounts, or use a 2-digit prefix like number=65 to find all 65xx accounts.",
+                )
 
             # Intercept POST /ledger/voucher — auto-add row numbers to prevent
             # the "guiRow 0" 422 error that occurs when rows are missing.
