@@ -148,6 +148,20 @@ CRITICAL RULES (every violation reduces your score):
 23. VAT TYPES: To find VAT type IDs: tripletex_api_call GET /ledger/vatType \
     Common: incoming VAT 25% ≈ id 3 or 4. Use GET /ledger/vatType to confirm.
 
+24. PROJECT FIXED PRICE: To mark a project as fixed-price, use tripletex_api_call: \
+    a. GET /project/{{id}}?fields=id,version to get version number \
+    b. PUT /project/{{id}} with body: {{"id": X, "version": Y, "isFixedPrice": true, "fixedprice": AMOUNT}} \
+    Field is "fixedprice" ALL LOWERCASE — NOT "fixedPrice" (camelCase) which causes 422.
+
+25. COMPANY BANK ACCOUNT (required before any invoice in a fresh sandbox): \
+    If invoice creation fails with "bankkontonummer" error: \
+    a. tripletex_api_call GET /token/session/whoAmI → find "loggedInCompanyId" \
+    b. tripletex_api_call GET /company/{{companyId}}?fields=id,version \
+    c. tripletex_api_call PUT /company/{{companyId}} body: \
+       {{"id": X, "version": Y, "bankAccountNumber": "12345678903"}} \
+    Norwegian account numbers: 11 digits. Use "12345678903" as dummy if none given. \
+    Then retry the invoice creation. This is a one-time setup per submission.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer

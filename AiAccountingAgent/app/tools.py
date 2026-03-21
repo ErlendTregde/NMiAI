@@ -659,9 +659,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             }))
 
         case "tripletex_grant_entitlement":
+            # Note: field is "entitlementId" (integer), NOT "entitlement": {object}
             return client.post("/employee/entitlement", {
                 "employee": {"id": args["employee_id"]},
-                "entitlement": {"id": args["entitlement_id"]},
+                "entitlementId": args["entitlement_id"],
                 "customer": {"id": 0},  # 0 = current company (required by API)
             })
 
@@ -768,10 +769,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "vatType": {"id": line["vatTypeId"]} if line.get("vatTypeId") else None,
                 })
                 order_lines.append(ol)
+            # Default deliveryDate to orderDate — Tripletex requires it for project orders
+            delivery_date = args.get("deliveryDate") or args.get("orderDate")
             body = _none_stripped({
                 "customer": {"id": args["customer_id"]},
                 "orderDate": args["orderDate"],
-                "deliveryDate": args.get("deliveryDate") or None,
+                "deliveryDate": delivery_date,
                 "orderLines": order_lines or None,
             })
             return client.post("/order", body)
