@@ -1,0 +1,2152 @@
+{
+  "round_id": "benchmark-round7-train",
+  "buckets": {
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        126.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 126.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        362.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 362.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        170.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 170.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        30.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 30.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        176.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 176.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:10+|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        9.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 9.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:10+|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        340.1100000000002,
+        16.665000000000003,
+        6.539999999999996,
+        0.9750000000000006,
+        0.7100000000000004,
+        0.0
+      ],
+      "evidence": 365.0,
+      "mean_distribution": [
+        0.9318082191780821,
+        0.04565753424657532,
+        0.017917808219178058,
+        0.002671232876712329,
+        0.0019452054794520546,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        0.7150000000000003,
+        6.255,
+        2.4750000000000005,
+        0.30000000000000004,
+        99.25500000000002,
+        0.0
+      ],
+      "evidence": 109.0,
+      "mean_distribution": [
+        0.006559633027522937,
+        0.057385321100917416,
+        0.02270642201834862,
+        0.002752293577981651,
+        0.9105963302752293,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        112.95999999999997,
+        21.875,
+        32.34,
+        3.3149999999999946,
+        6.509999999999994,
+        0.0
+      ],
+      "evidence": 177.0,
+      "mean_distribution": [
+        0.6381920903954801,
+        0.12358757062146894,
+        0.18271186440677972,
+        0.018728813559322006,
+        0.03677966101694912,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        104.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 104.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        42.0,
+        0.0
+      ],
+      "evidence": 42.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:1-2|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        8.309999999999999,
+        11.264999999999997,
+        16.369999999999994,
+        1.7399999999999995,
+        32.31499999999999,
+        0.0
+      ],
+      "evidence": 70.0,
+      "mean_distribution": [
+        0.11871428571428572,
+        0.16092857142857142,
+        0.23385714285714282,
+        0.024857142857142855,
+        0.4616428571428571,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        21.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 21.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        301.93999999999994,
+        162.04999999999987,
+        0.0,
+        10.42000000000001,
+        24.589999999999993,
+        0.0
+      ],
+      "evidence": 499.0,
+      "mean_distribution": [
+        0.6050901803607216,
+        0.3247494989979959,
+        0.0,
+        0.020881763527054138,
+        0.04927855711422847,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:1-2|forest_dist:0|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        23.814999999999994,
+        70.735,
+        0.0,
+        4.104999999999992,
+        104.34500000000004,
+        0.0
+      ],
+      "evidence": 203.0,
+      "mean_distribution": [
+        0.11731527093596054,
+        0.3484482758620689,
+        0.0,
+        0.02022167487684725,
+        0.5140147783251233,
+        0.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:0": {
+      "counts": [
+        30.480000000000004,
+        37.14500000000001,
+        0.0,
+        2.954999999999999,
+        13.419999999999996,
+        0.0
+      ],
+      "evidence": 84.0,
+      "mean_distribution": [
+        0.3628571428571428,
+        0.442202380952381,
+        0.0,
+        0.03517857142857141,
+        0.1597619047619047,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        462.8800000000006,
+        29.559999999999995,
+        0.0,
+        1.4449999999999983,
+        1.1149999999999998,
+        0.0
+      ],
+      "evidence": 495.0,
+      "mean_distribution": [
+        0.9351111111111112,
+        0.059717171717171634,
+        0.0,
+        0.002919191919191912,
+        0.0022525252525252494,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        41.0,
+        0.0
+      ],
+      "evidence": 41.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        1.225,
+        14.979999999999993,
+        0.0,
+        0.7250000000000004,
+        152.07000000000002,
+        0.0
+      ],
+      "evidence": 169.0,
+      "mean_distribution": [
+        0.007248520710059171,
+        0.08863905325443781,
+        0.0,
+        0.004289940828402368,
+        0.8998224852071006,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        110.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 110.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        7.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 7.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        44.754999999999995,
+        1.375,
+        0.71,
+        0.08000000000000002,
+        0.08000000000000002,
+        0.0
+      ],
+      "evidence": 47.0,
+      "mean_distribution": [
+        0.9522340425531916,
+        0.029255319148936174,
+        0.015106382978723406,
+        0.0017021276595744687,
+        0.0017021276595744687,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:1-2|forest_dist:0|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        26.295,
+        53.65,
+        0.0,
+        4.089999999999996,
+        103.96500000000003,
+        0.0
+      ],
+      "evidence": 188.0,
+      "mean_distribution": [
+        0.13986702127659573,
+        0.2853723404255319,
+        0.0,
+        0.021755319148936147,
+        0.5530053191489362,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        637.9450000000011,
+        35.62500000000004,
+        0.0,
+        2.52499999999999,
+        1.9049999999999965,
+        0.0
+      ],
+      "evidence": 678.0,
+      "mean_distribution": [
+        0.9409218289085547,
+        0.052544247787610604,
+        0.0,
+        0.003724188790560452,
+        0.002809734513274327,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        373.14500000000015,
+        150.67000000000002,
+        0.0,
+        11.149999999999993,
+        31.03500000000003,
+        0.0
+      ],
+      "evidence": 566.0,
+      "mean_distribution": [
+        0.6592667844522968,
+        0.26620141342756176,
+        0.0,
+        0.01969964664310952,
+        0.05483215547703183,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        1.5499999999999994,
+        13.025000000000002,
+        0.0,
+        0.9050000000000004,
+        221.52000000000004,
+        0.0
+      ],
+      "evidence": 237.0,
+      "mean_distribution": [
+        0.006540084388185651,
+        0.054957805907172995,
+        0.0,
+        0.0038185654008438827,
+        0.9346835443037975,
+        0.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:0": {
+      "counts": [
+        25.48499999999999,
+        26.870000000000008,
+        0.0,
+        2.3699999999999997,
+        11.274999999999995,
+        0.0
+      ],
+      "evidence": 66.0,
+      "mean_distribution": [
+        0.38613636363636356,
+        0.40712121212121233,
+        0.0,
+        0.03590909090909091,
+        0.17083333333333328,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        77.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 77.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        26.635000000000005,
+        9.78,
+        0.0,
+        0.7550000000000003,
+        1.8299999999999996,
+        0.0
+      ],
+      "evidence": 39.0,
+      "mean_distribution": [
+        0.6829487179487179,
+        0.2507692307692307,
+        0.0,
+        0.019358974358974365,
+        0.04692307692307691,
+        0.0
+      ]
+    },
+    "terrain:1|class:1|coastal:1|port:0|settle_dist:0|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:0": {
+      "counts": [
+        2.215,
+        0.8350000000000001,
+        1.79,
+        0.16,
+        1.0,
+        0.0
+      ],
+      "evidence": 6.0,
+      "mean_distribution": [
+        0.36916666666666664,
+        0.1391666666666667,
+        0.29833333333333334,
+        0.02666666666666667,
+        0.16666666666666666,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        57.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 57.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        524.7700000000006,
+        26.61499999999999,
+        0.0,
+        1.969999999999995,
+        1.6449999999999974,
+        0.0
+      ],
+      "evidence": 555.0,
+      "mean_distribution": [
+        0.9455315315315316,
+        0.04795495495495489,
+        0.0,
+        0.003549549549549537,
+        0.002963963963963956,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        291.6400000000001,
+        126.46000000000004,
+        0.0,
+        9.304999999999975,
+        23.595000000000017,
+        0.0
+      ],
+      "evidence": 451.0,
+      "mean_distribution": [
+        0.6466518847006653,
+        0.2803991130820399,
+        0.0,
+        0.020631929046563132,
+        0.05231707317073173,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:1-2|forest_dist:0|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        24.48000000000001,
+        55.73499999999995,
+        0.0,
+        4.104999999999996,
+        97.67999999999999,
+        0.0
+      ],
+      "evidence": 182.0,
+      "mean_distribution": [
+        0.13450549450549462,
+        0.30623626373626356,
+        0.0,
+        0.02255494505494504,
+        0.5367032967032969,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        1.305,
+        11.954999999999998,
+        0.0,
+        0.8050000000000004,
+        175.93500000000003,
+        0.0
+      ],
+      "evidence": 190.0,
+      "mean_distribution": [
+        0.0068684210526315775,
+        0.06292105263157893,
+        0.0,
+        0.0042368421052631595,
+        0.9259736842105264,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:6-9|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        14.0
+      ],
+      "evidence": 14.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        23.0
+      ],
+      "evidence": 23.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        20.0
+      ],
+      "evidence": 20.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:1-2|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:0": {
+      "counts": [
+        25.825000000000003,
+        27.619999999999994,
+        0.0,
+        2.1249999999999996,
+        11.430000000000007,
+        0.0
+      ],
+      "evidence": 67.0,
+      "mean_distribution": [
+        0.3854477611940299,
+        0.41223880597014917,
+        0.0,
+        0.031716417910447756,
+        0.17059701492537324,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:6-9|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        10.0
+      ],
+      "evidence": 10.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:0": {
+      "counts": [
+        2.49,
+        3.115,
+        0.0,
+        0.27999999999999997,
+        1.1149999999999998,
+        0.0
+      ],
+      "evidence": 7.0,
+      "mean_distribution": [
+        0.35571428571428576,
+        0.445,
+        0.0,
+        0.039999999999999994,
+        0.15928571428571425,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        28.604999999999997,
+        1.1849999999999998,
+        0.0,
+        0.12000000000000004,
+        0.09000000000000001,
+        0.0
+      ],
+      "evidence": 30.0,
+      "mean_distribution": [
+        0.9535,
+        0.0395,
+        0.0,
+        0.004000000000000002,
+        0.0030000000000000005,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        3.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        39.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 39.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        9.485,
+        4.285,
+        0.0,
+        0.3400000000000001,
+        0.8899999999999999,
+        0.0
+      ],
+      "evidence": 15.0,
+      "mean_distribution": [
+        0.6323333333333333,
+        0.2856666666666667,
+        0.0,
+        0.022666666666666672,
+        0.05933333333333333,
+        0.0
+      ]
+    },
+    "terrain:2|class:2|coastal:1|port:1|settle_dist:0|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:0": {
+      "counts": [
+        6.07,
+        1.775,
+        2.7600000000000007,
+        0.33,
+        3.065,
+        0.0
+      ],
+      "evidence": 14.0,
+      "mean_distribution": [
+        0.4335714285714286,
+        0.12678571428571428,
+        0.1971428571428572,
+        0.023571428571428573,
+        0.21892857142857142,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        13.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 13.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        105.86000000000004,
+        55.07499999999997,
+        0.0,
+        4.039999999999993,
+        9.024999999999997,
+        0.0
+      ],
+      "evidence": 174.0,
+      "mean_distribution": [
+        0.6083908045977013,
+        0.31652298850574695,
+        0.0,
+        0.02321839080459766,
+        0.051867816091954004,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        0.43000000000000005,
+        4.219999999999999,
+        0.0,
+        0.3450000000000001,
+        83.005,
+        0.0
+      ],
+      "evidence": 88.0,
+      "mean_distribution": [
+        0.004886363636363637,
+        0.047954545454545444,
+        0.0,
+        0.003920454545454546,
+        0.9432386363636364,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        27.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 27.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        240.03000000000006,
+        17.830000000000005,
+        0.0,
+        1.1700000000000002,
+        0.9700000000000006,
+        0.0
+      ],
+      "evidence": 260.0,
+      "mean_distribution": [
+        0.9231923076923075,
+        0.06857692307692306,
+        0.0,
+        0.004499999999999999,
+        0.0037307692307692315,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        22.0,
+        0.0
+      ],
+      "evidence": 22.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        22.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 22.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        9.81,
+        0.185,
+        0.0,
+        0.0,
+        0.005,
+        0.0
+      ],
+      "evidence": 10.0,
+      "mean_distribution": [
+        0.9809999999999999,
+        0.018499999999999996,
+        0.0,
+        0.0,
+        0.0004999999999999999,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        15.505,
+        0.42000000000000004,
+        0.0,
+        0.034999999999999996,
+        0.04,
+        0.0
+      ],
+      "evidence": 16.0,
+      "mean_distribution": [
+        0.9690625,
+        0.026250000000000002,
+        0.0,
+        0.0021874999999999998,
+        0.0025,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        2.8449999999999998,
+        2.51,
+        0.0,
+        0.19999999999999998,
+        0.445,
+        0.0
+      ],
+      "evidence": 6.0,
+      "mean_distribution": [
+        0.4741666666666666,
+        0.4183333333333333,
+        0.0,
+        0.03333333333333333,
+        0.07416666666666667,
+        0.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:1-2|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:0": {
+      "counts": [
+        7.3199999999999985,
+        11.540000000000001,
+        0.0,
+        0.8200000000000003,
+        3.3200000000000003,
+        0.0
+      ],
+      "evidence": 23.0,
+      "mean_distribution": [
+        0.3182608695652173,
+        0.5017391304347827,
+        0.0,
+        0.03565217391304349,
+        0.14434782608695654,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:10+|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        5.0
+      ],
+      "evidence": 5.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:10+|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        14.0
+      ],
+      "evidence": 14.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:1-2|forest_dist:0|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        10.584999999999999,
+        28.840000000000007,
+        0.0,
+        2.069999999999999,
+        33.505,
+        0.0
+      ],
+      "evidence": 75.0,
+      "mean_distribution": [
+        0.14113333333333333,
+        0.38453333333333345,
+        0.0,
+        0.027599999999999986,
+        0.44673333333333337,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        16.775000000000002,
+        8.334999999999999,
+        0.0,
+        0.555,
+        1.3349999999999995,
+        0.0
+      ],
+      "evidence": 27.0,
+      "mean_distribution": [
+        0.6212962962962963,
+        0.30870370370370365,
+        0.0,
+        0.020555555555555556,
+        0.04944444444444443,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:10+|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        37.26499999999999,
+        1.6699999999999997,
+        0.0,
+        0.045000000000000005,
+        0.02,
+        0.0
+      ],
+      "evidence": 39.0,
+      "mean_distribution": [
+        0.9555128205128204,
+        0.042820512820512815,
+        0.0,
+        0.001153846153846154,
+        0.0005128205128205128,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        12.0,
+        0.0
+      ],
+      "evidence": 12.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        5.0
+      ],
+      "evidence": 5.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:6-9|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:1|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        3.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        16.69,
+        3.2250000000000005,
+        4.585,
+        0.4650000000000002,
+        1.0350000000000001,
+        0.0
+      ],
+      "evidence": 26.0,
+      "mean_distribution": [
+        0.6419230769230769,
+        0.12403846153846154,
+        0.17634615384615382,
+        0.01788461538461539,
+        0.03980769230769231,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        12.0
+      ],
+      "evidence": 12.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        6.0
+      ],
+      "evidence": 6.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        9.0
+      ],
+      "evidence": 9.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:10|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        3.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        8.0,
+        0.0
+      ],
+      "evidence": 8.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:3-5|ruin_dist:none|coast_dist:6-9|landmass_size:large|buildable:0": {
+      "counts": [
+        0.4,
+        0.405,
+        0.0,
+        0.06,
+        0.135,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.4,
+        0.405,
+        0.0,
+        0.06,
+        0.135,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:6-9|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        6.0
+      ],
+      "evidence": 6.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:6-9|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        3.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:tiny|buildable:1": {
+      "counts": [
+        5.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 5.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:tiny|buildable:1": {
+      "counts": [
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:6-9|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:tiny|buildable:1": {
+      "counts": [
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:10+|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        28.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 28.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:10+|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        4.0,
+        0.0
+      ],
+      "evidence": 4.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:10+|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:large|buildable:1": {
+      "counts": [
+        9.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 9.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        9.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 9.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        4.0,
+        0.0
+      ],
+      "evidence": 4.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:10+|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:large|buildable:1": {
+      "counts": [
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:tiny|buildable:1": {
+      "counts": [
+        5.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 5.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        15.68,
+        0.19,
+        0.105,
+        0.015,
+        0.01,
+        0.0
+      ],
+      "evidence": 16.0,
+      "mean_distribution": [
+        0.98,
+        0.011875,
+        0.0065625,
+        0.0009375,
+        0.000625,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:small|buildable:1": {
+      "counts": [
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:tiny|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.005,
+        0.0,
+        2.995,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0016666666666666668,
+        0.0,
+        0.9983333333333334,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:small|buildable:1": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:6-9|forest_dist:0|ruin_dist:none|coast_dist:1-2|landmass_size:small|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:0|port:0|settle_dist:3-5|forest_dist:0|ruin_dist:none|coast_dist:1-2|landmass_size:small|buildable:1": {
+      "counts": [
+        0.005,
+        0.09,
+        0.0,
+        0.005,
+        1.9,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        0.0025,
+        0.045,
+        0.0,
+        0.0025,
+        0.95,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        2.1849999999999996,
+        0.3,
+        0.365,
+        0.07,
+        0.08,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        0.7283333333333333,
+        0.1,
+        0.12166666666666669,
+        0.023333333333333338,
+        0.026666666666666672,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        0.55,
+        0.14,
+        0.2,
+        0.04,
+        0.07,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.5499999999999999,
+        0.13999999999999999,
+        0.19999999999999996,
+        0.039999999999999994,
+        0.06999999999999999,
+        0.0
+      ]
+    },
+    "terrain:2|class:2|coastal:1|port:1|settle_dist:0|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:0": {
+      "counts": [
+        0.395,
+        0.18,
+        0.185,
+        0.025,
+        0.215,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.395,
+        0.18,
+        0.185,
+        0.025,
+        0.215,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:1-2|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:small|buildable:1": {
+      "counts": [
+        1.24,
+        0.59,
+        0.0,
+        0.045,
+        0.125,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        0.62,
+        0.295,
+        0.0,
+        0.0225,
+        0.0625,
+        0.0
+      ]
+    },
+    "terrain:4|class:4|coastal:1|port:0|settle_dist:1-2|forest_dist:0|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.0,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:1|port:0|settle_dist:3-5|forest_dist:3-5|ruin_dist:none|coast_dist:0|landmass_size:small|buildable:1": {
+      "counts": [
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:10+|landmass_size:large|buildable:1": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:0|port:0|settle_dist:1-2|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:1|class:1|coastal:0|port:0|settle_dist:0|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:0": {
+      "counts": [
+        1.09,
+        0.39,
+        0.0,
+        0.034999999999999996,
+        0.485,
+        0.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        0.545,
+        0.195,
+        0.0,
+        0.017499999999999998,
+        0.2425,
+        0.0
+      ]
+    },
+    "terrain:11|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:3-5|ruin_dist:none|coast_dist:3-5|landmass_size:large|buildable:1": {
+      "counts": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:10|class:0|coastal:0|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        3.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "evidence": 3.0,
+      "mean_distribution": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "terrain:5|class:5|coastal:1|port:0|settle_dist:6-9|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "evidence": 1.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    "terrain:5|class:5|coastal:1|port:0|settle_dist:3-5|forest_dist:1-2|ruin_dist:none|coast_dist:1-2|landmass_size:water|buildable:0": {
+      "counts": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        2.0
+      ],
+      "evidence": 2.0,
+      "mean_distribution": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  }
+}

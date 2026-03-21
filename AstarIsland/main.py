@@ -1,6 +1,6 @@
-def main():
-    print("Hello from astarisland!")
+from astarisland.cli.app import main
 
 
 if __name__ == "__main__":
     main()
+

@@ -1,7 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "astarisland"
 version = "0.1.0"
-description = "Add your description here"
+description = "CLI baseline client for the Astar Island prediction challenge"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+  "httpx>=0.28.1",
+  "joblib>=1.5.2",
+  "numpy>=2.3.0",
+  "orjson>=3.10.18",
+  "pydantic>=2.11.3",
+  "pydantic-settings>=2.8.1",
+  "rich>=14.0.0",
+  "scikit-learn>=1.7.2",
+  "tenacity>=9.1.2",
+  "typer>=0.16.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.0",
+  "respx>=0.22.0",
+]
+
+[project.scripts]
+astar-island = "astarisland.cli.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/astarisland"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

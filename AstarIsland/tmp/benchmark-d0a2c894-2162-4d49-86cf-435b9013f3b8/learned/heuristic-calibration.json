@@ -1,0 +1,32 @@
+{
+  "model_version": "v4-regime-calibrated-heuristic",
+  "generated_from_rounds": [
+    "d0a2c894-2162-4d49-86cf-435b9013f3b8-train"
+  ],
+  "coefficients": {
+    "dynamic_target_scale": 0.92,
+    "settlement_uplift_scale": 1.103211898861982,
+    "port_suppression_scale": 0.8,
+    "ruin_suppression_scale": 0.85,
+    "stable_negative_threshold": 0.5744,
+    "growth_frontier_threshold": 0.5458072860682811,
+    "collapse_frontier_threshold": 0.5750000000000001,
+    "maritime_frontier_threshold": 0.624,
+    "positive_frontier_weight": 1.0,
+    "settlement_false_negative_weight": 1.1,
+    "collapse_frontier_weight": 1.05,
+    "coastal_port_weight": 0.78
+  },
+  "aggregate_metrics": {
+    "pred_dynamic_mass": 0.25950261306428163,
+    "truth_dynamic_mass": 0.260935,
+    "pred_high_entropy_settlement": 0.294157727298008,
+    "truth_high_entropy_settlement": 0.32451830489736044,
+    "pred_high_entropy_port": 0.010977480125263925,
+    "truth_high_entropy_port": 0.017583098076482152,
+    "pred_high_entropy_ruin": 0.03427133993948903,
+    "truth_high_entropy_ruin": 0.03149693459682897,
+    "covered_dynamic_weighted_kl": 0.12516377631045622,
+    "uncovered_dynamic_weighted_kl": 0.3169613842015829
+  }
+}

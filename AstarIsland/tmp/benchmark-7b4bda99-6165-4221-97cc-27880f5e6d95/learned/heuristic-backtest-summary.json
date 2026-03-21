@@ -1,0 +1,39 @@
+{
+  "model_version": "v4-regime-calibrated-heuristic",
+  "rounds": [
+    {
+      "round_id": "7b4bda99-6165-4221-97cc-27880f5e6d95-train",
+      "average_score": 70.75069829327734,
+      "seed_scores": [
+        69.62679647616692,
+        71.97291024629914,
+        68.71500840143028,
+        69.912326494585,
+        73.5264498479054
+      ],
+      "pred_dynamic_mass": 0.12627560058253956,
+      "truth_dynamic_mass": 0.102638125,
+      "pred_high_entropy_settlement": 0.1277335636074645,
+      "truth_high_entropy_settlement": 0.12912790406747696,
+      "pred_high_entropy_port": 0.01930697690744696,
+      "truth_high_entropy_port": 0.006638468644272892,
+      "pred_high_entropy_ruin": 0.024422823929551356,
+      "truth_high_entropy_ruin": 0.016336109895223862,
+      "covered_dynamic_weighted_kl": 0.11642101524734061,
+      "uncovered_dynamic_weighted_kl": 0.1305056095175249
+    }
+  ],
+  "average_score": 70.75069829327734,
+  "aggregate_metrics": {
+    "pred_dynamic_mass": 0.12627560058253956,
+    "truth_dynamic_mass": 0.102638125,
+    "pred_high_entropy_settlement": 0.1277335636074645,
+    "truth_high_entropy_settlement": 0.12912790406747696,
+    "pred_high_entropy_port": 0.01930697690744696,
+    "truth_high_entropy_port": 0.006638468644272892,
+    "pred_high_entropy_ruin": 0.024422823929551356,
+    "truth_high_entropy_ruin": 0.016336109895223862,
+    "covered_dynamic_weighted_kl": 0.11642101524734061,
+    "uncovered_dynamic_weighted_kl": 0.1305056095175249
+  }
+}

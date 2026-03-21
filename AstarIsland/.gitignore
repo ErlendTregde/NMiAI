@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Tooling and local state
+.pytest_cache/
+.coverage
+.env
+data/rounds/

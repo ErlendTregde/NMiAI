@@ -1,0 +1,102 @@
+{
+  "model_version": "v4-regime-calibrated-heuristic",
+  "rounds": [
+    {
+      "round_id": "36e581f1-73f8-453f-ab98-cbe3052b701b",
+      "average_score": 47.50751850283238,
+      "seed_scores": [
+        46.168100617144795,
+        45.27054093122027,
+        55.11292217889101,
+        41.20533598752511,
+        49.78069279938076
+      ],
+      "pred_dynamic_mass": 0.20885679632859055,
+      "truth_dynamic_mass": 0.150388125,
+      "pred_high_entropy_settlement": 0.287791337259147,
+      "truth_high_entropy_settlement": 0.3151841652093336,
+      "pred_high_entropy_port": 0.026057944334732908,
+      "truth_high_entropy_port": 0.021488789744803467,
+      "pred_high_entropy_ruin": 0.03648612064641236,
+      "truth_high_entropy_ruin": 0.022910460075435624,
+      "covered_dynamic_weighted_kl": 0.1986481947220443,
+      "uncovered_dynamic_weighted_kl": 0.3546092126725616
+    },
+    {
+      "round_id": "7b4bda99-6165-4221-97cc-27880f5e6d95",
+      "average_score": 63.272728296311186,
+      "seed_scores": [
+        61.50010298419332,
+        62.58237569820838,
+        63.99454770431618,
+        63.935169464138816,
+        64.35144563069923
+      ],
+      "pred_dynamic_mass": 0.17697664651792805,
+      "truth_dynamic_mass": 0.102638125,
+      "pred_high_entropy_settlement": 0.18239850691361098,
+      "truth_high_entropy_settlement": 0.12912790406747696,
+      "pred_high_entropy_port": 0.017204467266503157,
+      "truth_high_entropy_port": 0.006638468644272892,
+      "pred_high_entropy_ruin": 0.04005482052648028,
+      "truth_high_entropy_ruin": 0.016336109895223862,
+      "covered_dynamic_weighted_kl": 0.17062069975338004,
+      "uncovered_dynamic_weighted_kl": 0.1129652803726962
+    },
+    {
+      "round_id": "cc5442dd-bc5d-418b-911b-7eb960cb0390",
+      "average_score": 63.24012641409621,
+      "seed_scores": [
+        62.8970157080159,
+        63.32758481256536,
+        64.57205485914824,
+        62.66162347817027,
+        62.742353212581314
+      ],
+      "pred_dynamic_mass": 0.2083566361791262,
+      "truth_dynamic_mass": 0.18083,
+      "pred_high_entropy_settlement": 0.20657408074567965,
+      "truth_high_entropy_settlement": 0.19654204377213108,
+      "pred_high_entropy_port": 0.016320248948841837,
+      "truth_high_entropy_port": 0.00996237190579888,
+      "pred_high_entropy_ruin": 0.03369291776232443,
+      "truth_high_entropy_ruin": 0.02096346501621866,
+      "covered_dynamic_weighted_kl": 0.14844440999282915,
+      "uncovered_dynamic_weighted_kl": 0.15448539697509728
+    },
+    {
+      "round_id": "d0a2c894-2162-4d49-86cf-435b9013f3b8",
+      "average_score": 51.74776240816601,
+      "seed_scores": [
+        51.984349883529745,
+        53.32754643993122,
+        52.91913730972981,
+        54.70831923589559,
+        45.79945917174372
+      ],
+      "pred_dynamic_mass": 0.267073236828932,
+      "truth_dynamic_mass": 0.260935,
+      "pred_high_entropy_settlement": 0.2970469224721094,
+      "truth_high_entropy_settlement": 0.32451830489736044,
+      "pred_high_entropy_port": 0.0187290083465196,
+      "truth_high_entropy_port": 0.017583098076482152,
+      "pred_high_entropy_ruin": 0.03668281018164411,
+      "truth_high_entropy_ruin": 0.03149693459682897,
+      "covered_dynamic_weighted_kl": 0.18072152920809004,
+      "uncovered_dynamic_weighted_kl": 0.37046166427963534
+    }
+  ],
+  "average_score": 56.44203390535145,
+  "aggregate_metrics": {
+    "pred_dynamic_mass": 0.2153158289636442,
+    "truth_dynamic_mass": 0.1736978125,
+    "pred_high_entropy_settlement": 0.24345271184763675,
+    "truth_high_entropy_settlement": 0.2413431044865755,
+    "pred_high_entropy_port": 0.019577917224149373,
+    "truth_high_entropy_port": 0.013918182092839347,
+    "pred_high_entropy_ruin": 0.0367291672792153,
+    "truth_high_entropy_ruin": 0.022926742395926777,
+    "covered_dynamic_weighted_kl": 0.17460870841908588,
+    "uncovered_dynamic_weighted_kl": 0.2481303885749976
+  }
+}
