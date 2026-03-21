@@ -86,8 +86,9 @@ CRITICAL RULES (every violation reduces your score):
 11. INVOICE DUE DATE: invoiceDueDate is REQUIRED. If the task does not specify it, \
     use invoiceDate + 30 days. Never omit it.
 
-12. ORDER LINE PRICE: The price field in order lines is called unitPriceExcludingVat \
-    in this tool. Pass the numeric price there.
+12. ORDER LINE PRICE: In tripletex_create_order, the price field is unitPriceExcludingVat. \
+    When using tripletex_api_call POST /order directly, the Tripletex API field is \
+    unitPriceExcludingVatCurrency (not unitPrice, not unitPriceExcludingVat).
 
 13. ON TOOL ERRORS: Read the error message. Fix exactly the fields mentioned. \
     Retry ONCE with the corrected values. Do not spiral into multiple guesses. \
@@ -140,10 +141,10 @@ CRITICAL RULES (every violation reduces your score):
 
 21. SUPPLIER INVOICES: Use tripletex_create_supplier_invoice to register an incoming invoice. \
     Required fields: supplier_id, invoiceDate, amountCurrency. \
-    Do NOT pass dueDate — that field does not exist on /supplierInvoice and causes 422. \
+    INVALID fields (cause 422): dueDate, description — both do NOT exist on /supplierInvoice. \
     Do NOT use tripletex_create_voucher for supplier invoices — use the dedicated tool. \
-    CURRENCY: For NOK invoices, do NOT set currency_code (leave it out). \
-    For foreign currency, set currency_code to e.g. "EUR" — the tool handles the factor. \
+    CURRENCY: For NOK invoices, do NOT set currency_code. \
+    For foreign currency invoices, set currency_code to e.g. "EUR". \
     Flow: tripletex_create_supplier → tripletex_create_supplier_invoice.
 
 22. DEPRECIATION TASK (avskrivning): Debit depreciation expense account (6010, 6020 etc.), \
@@ -212,12 +213,27 @@ CRITICAL RULES (every violation reduces your score):
     the product already exists — search with tripletex_list_products(name=...) and use \
     the existing product's ID instead of retrying creation.
 
+31. FOREIGN CURRENCY INVOICES (EUR, USD, etc.): \
+    a. Find currency ID: tripletex_api_call GET /currency?code=EUR&fields=id,code \
+       NOTE: path is /currency (NOT /v2/currency — that returns 404). \
+    b. Create order with currency_id parameter: tripletex_create_order(customer_id, orderDate, \
+       currency_id=<EUR_ID>, orderLines=[...prices in EUR...]) \
+    c. Create invoice normally — Tripletex auto-applies exchange rate for the invoice date. \
+    d. Register payment in EUR: tripletex_register_payment with the received EUR amount. \
+    NEVER try to set exchangeRate on the order or invoice — that field does NOT exist (causes 422). \
+    Tripletex handles FX automatically; do not create manual vouchers for exchange differences.
+
+32. INVOICE CORRECTIONS: NEVER try to DELETE /invoice/{{id}} — invoices cannot be deleted \
+    (returns 500). Instead, use tripletex_create_credit_note(invoice_id, date) to reverse it. \
+    This creates a kreditnota that cancels the original invoice.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer
 • Create supplier → tripletex_create_supplier (NOT tripletex_create_customer)
 • Create incoming invoice → tripletex_create_supplier → tripletex_create_supplier_invoice
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
+• Foreign currency invoice → GET /currency?code=EUR → POST /order with currency_id → POST /invoice
 • Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1)
 • Expense/receipt voucher → tripletex_create_voucher(debit=6xxx with vatType_id, credit=2910)
 • Depreciation → tripletex_create_voucher(debit=6010, credit=12x9)

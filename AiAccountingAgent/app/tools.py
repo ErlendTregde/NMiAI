@@ -191,7 +191,6 @@ _DECLARATIONS = [
                 "currency_code": _s("Currency code, e.g. 'NOK', 'EUR', 'USD' — defaults to NOK"),
                 "invoiceNumber": _s("Supplier's invoice number — optional"),
                 "kid": _s("Payment reference / KID number — optional"),
-                "description": _s("Description / comment — optional"),
             },
             required=["supplier_id", "invoiceDate", "amountCurrency"],
         ),
@@ -285,6 +284,7 @@ _DECLARATIONS = [
                 "customer_id": _i("Customer ID"),
                 "orderDate": _s("Order date (YYYY-MM-DD)"),
                 "deliveryDate": _s("Delivery date (YYYY-MM-DD) — optional"),
+                "currency_id": _i("Currency ID for foreign currency orders — find with GET /currency?code=EUR. Omit for NOK."),
                 "orderLines": _arr(
                     _obj({
                         "product_id": _i("Product ID — omit for free-text lines"),
@@ -721,7 +721,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "currency": {"code": currency_code, "factor": 1} if currency_code != "NOK" else None,
                 "invoiceNumber": args.get("invoiceNumber"),
                 "kid": args.get("kid"),
-                "description": args.get("description"),
+                # description does NOT exist on /supplierInvoice — omitted
             })
             return client.post("/supplierInvoice", body)
 
@@ -796,6 +796,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "customer": {"id": args["customer_id"]},
                 "orderDate": args["orderDate"],
                 "deliveryDate": delivery_date,
+                "currency": {"id": args["currency_id"]} if args.get("currency_id") else None,
                 "orderLines": order_lines or None,
             })
             return client.post("/order", body)
