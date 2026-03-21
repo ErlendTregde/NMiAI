@@ -315,14 +315,14 @@ _DECLARATIONS = [
         description=(
             "Create an invoice from an existing order. "
             "You MUST have an order_id — create the order first if needed. "
-            "Full chain: create customer → create product → create order → create invoice."
+            "Full chain: create customer → create product → create order → create invoice. "
+            "To send the invoice to the customer, call tripletex_send_invoice AFTER creation."
         ),
         parameters=_obj(
             {
                 "order_id": _i("Order ID to invoice"),
                 "invoiceDate": _s("Invoice date (YYYY-MM-DD)"),
                 "invoiceDueDate": _s("Payment due date (YYYY-MM-DD)"),
-                "sendToCustomer": _b("Send to customer immediately (default false)"),
             },
             required=["order_id", "invoiceDate"],
         ),
@@ -469,6 +469,22 @@ _DECLARATIONS = [
             },
             required=["name"],
         ),
+    ),
+
+    types.FunctionDeclaration(
+        name="tripletex_list_activities",
+        description=(
+            "List activities. Call this BEFORE creating an activity to check if one with that name "
+            "already exists (Tripletex has default global activities for common names like 'Utvikling', "
+            "'Design', 'Administrasjon'). If the activity exists and isChargeable=true, use its ID "
+            "directly. If it exists but isChargeable=false, create a NEW activity with a DIFFERENT name. "
+            "NEVER try to update/PUT an existing activity — it returns 500."
+        ),
+        parameters=_obj({
+            "name": _s("Filter by activity name (partial match)"),
+            "fields": _s("Fields to return, e.g. 'id,name,isChargeable,isGeneral'"),
+            "count": _i("Max results"),
+        }),
     ),
 
     types.FunctionDeclaration(
@@ -816,8 +832,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "invoiceDueDate": due_date,
                 "orders": [{"id": args["order_id"]}],
             }
-            if args.get("sendToCustomer") is not None:
-                body["sendToCustomer"] = args["sendToCustomer"]
+            # sendToCustomer removed — use tripletex_send_invoice separately
             return client.post("/invoice", body)
 
         case "tripletex_list_invoices":
@@ -897,6 +912,13 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             }))
 
         # ── Activities ────────────────────────────────────────────────────────
+
+        case "tripletex_list_activities":
+            return client.get("/activity", params=_none_stripped({
+                "name": args.get("name"),
+                "fields": args.get("fields", "id,name,isChargeable,isGeneral,description"),
+                "count": args.get("count", 10),
+            }))
 
         case "tripletex_create_activity":
             return client.post("/activity", _none_stripped({

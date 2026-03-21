@@ -81,7 +81,12 @@ CRITICAL RULES (every violation reduces your score):
    NEVER invent product numbers — omit the field if not specified by the task.
 
 10. PAYMENT FIELDS: tripletex_register_payment uses these exact fields: \
-    invoice_id, paymentDate (YYYY-MM-DD), amount (number), paymentTypeId (1=bank transfer).
+    invoice_id, paymentDate (YYYY-MM-DD), amount (number), paymentTypeId. \
+    If payment returns 404 "Object not found": the paymentTypeId is wrong for this sandbox. \
+    Immediately do: tripletex_api_call GET /invoice/paymentType \
+    Pick the first result's id (or the one named "bank"/"overførsel") and retry with that id. \
+    IMPORTANT: Do NOT try to set up a company bank account just because payment returns 404. \
+    Query /invoice/paymentType first — that is the correct fix for payment 404.
 
 11. INVOICE DUE DATE: invoiceDueDate is REQUIRED. If the task does not specify it, \
     use invoiceDate + 30 days. Never omit it.
@@ -98,11 +103,18 @@ CRITICAL RULES (every violation reduces your score):
     Do NOT try to set userType manually via tripletex_api_call.
 
 15. PROJECT ACTIVITIES & BILLING: \
-    a. tripletex_create_activity(name, isChargeable=true for billable work) \
-    b. tripletex_link_activity_to_project(project_id, activity_id) — REQUIRED before use \
-    c. Log hours: tripletex_api_call POST /timesheet/entry body: \
+    a. ALWAYS call tripletex_list_activities(name=X) BEFORE creating any activity. \
+       Tripletex has built-in global activities with common names (e.g. 'Utvikling', 'Design', \
+       'Administrasjon'). If one exists with the right name: \
+       - If isChargeable=true: use its ID directly (skip creation). \
+       - If isChargeable=false: create a NEW activity with a DIFFERENT name \
+         (e.g. "Utvikling - fakturerbar" or "Design (billable)"). \
+       NEVER try to update/PUT an existing activity — it returns 500. \
+    b. tripletex_create_activity(name, isChargeable=True for billable work) — only if not found. \
+    c. tripletex_link_activity_to_project(project_id, activity_id) — REQUIRED before use. \
+    d. Log hours: tripletex_api_call POST /timesheet/entry body: \
        {{"employee":{{"id":X}},"project":{{"id":Y}},"activity":{{"id":Z}},"date":"YYYY-MM-DD","hours":8.0}} \
-    d. Invoice: tripletex_create_order(customer_id) → tripletex_create_invoice(order_id) \
+    e. Invoice: tripletex_create_order(customer_id) → tripletex_create_invoice(order_id) \
     NEVER use PUT /project/{{id}}/activity or PUT /project/{{id}} to link activities — both fail.
 
 16. SALARY/PAYROLL TASKS: NEVER use tripletex_create_voucher for salary. \
@@ -165,8 +177,8 @@ CRITICAL RULES (every violation reduces your score):
     b. PUT /project/{{id}} with body: {{"id": X, "version": Y, "isFixedPrice": true, "fixedprice": AMOUNT}} \
     Field is "fixedprice" ALL LOWERCASE — NOT "fixedPrice" (camelCase) which causes 422.
 
-25. COMPANY BANK ACCOUNT (required before invoice creation or payment in fresh sandbox): \
-    If invoice creation fails with "bankkontonummer" error OR payment returns unexpected 404: \
+25. COMPANY BANK ACCOUNT (only needed when invoice creation fails with "bankkontonummer"): \
+    If invoice creation fails with "bankkontonummer" error: \
     a. tripletex_api_call GET /employee/entitlement → take values[0].customer.id = companyId \
        (DO NOT use GET /company list — returns 405. Use entitlement response to find company ID.) \
     b. tripletex_api_call GET /company/{{companyId}}?fields=id,version → get version number \
@@ -175,7 +187,8 @@ CRITICAL RULES (every violation reduces your score):
     Norwegian account numbers: 11 digits. Use "12345678903" as dummy if none given. \
     If PUT /company/{{companyId}} also returns 405, the proxy blocks this endpoint — \
     skip bank account setup and accept invoicing will fail for this submission. \
-    Then retry the failed operation. This is a one-time setup per submission.
+    IMPORTANT: Do NOT trigger bank account setup for payment 404 errors — \
+    payment 404 is caused by wrong paymentTypeId (see Rule 10), not missing bank account.
 
 26. EMPLOYEE EMPLOYMENT RECORD: \
     Path is POST /employee/employment. \
@@ -257,6 +270,21 @@ CRITICAL RULES (every violation reduces your score):
     f. If bank statement shows existing sequential invoice IDs (1, 2, 3 etc. already in system), \
        list them with tripletex_list_invoices to find matching amounts, then register payments.
 
+35. API CALL PATHS: When using tripletex_api_call, NEVER prefix the path with /v2/. \
+    Paths always start directly with /: /employee, /ledger/account, /currency, /activity. \
+    WRONG: /v2/ledger/account (returns 404), /v2/currency (returns 404). \
+    RIGHT: /ledger/account, /currency, /activity, /invoice/paymentType. \
+    This rule applies to ALL direct api_call paths without exception.
+
+36. INVOICE SEND vs PAYMENT: \
+    'Send invoice' and 'register payment' are TWO SEPARATE operations: \
+    a. tripletex_send_invoice: sends the invoice document to the customer (email/EHF). \
+       Required when task says "send the invoice" or "faktura til kunde". \
+    b. tripletex_register_payment: marks the invoice as paid in Tripletex. \
+       Required when task says "register payment" or "registrer betaling". \
+    For PAYMENT tasks: create order → create invoice → register payment. \
+    Do NOT send the invoice before payment unless the task explicitly asks to send it.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create employment → POST /employee/employment with minimum body (NO division.id)
@@ -265,7 +293,10 @@ COMMON PATTERNS:
 • Create incoming invoice → tripletex_create_supplier → tripletex_create_supplier_invoice
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
 • Foreign currency invoice → GET /currency?code=EUR → POST /order with currency_id → POST /invoice
-• Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1)
+• Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1) \
+  If 404: GET /invoice/paymentType → use first result id → retry
+• Activity for project billing → tripletex_list_activities(name=X) first → use existing if chargeable \
+  → else create new with different name → link to project → log hours → create order → invoice
 • Expense/receipt voucher → tripletex_create_voucher(debit=6xxx with vatType_id, credit=2910)
 • Depreciation → tripletex_create_voucher(debit=6010, credit=12x9)
 • Travel expense → tripletex_create_travel_expense(employee_id) → then api_call \
@@ -361,8 +392,24 @@ def run_agent(
 
         model_content = response.candidates[0].content
         if model_content is None:
-            logger.warning("Gemini returned candidate with no content (safety block?) — stopping.")
-            break
+            # One retry — can be a transient safety/content filter that clears on retry
+            logger.warning("Gemini returned no content — retrying once.")
+            try:
+                response = gemini_client.models.generate_content(
+                    model=config.GEMINI_MODEL,
+                    contents=contents,
+                    config=gen_config,
+                )
+                model_content = (
+                    response.candidates[0].content
+                    if response.candidates else None
+                )
+            except Exception as exc:
+                logger.error(f"Gemini retry failed: {exc}")
+                model_content = None
+            if model_content is None:
+                logger.warning("Gemini returned no content after retry — stopping.")
+                break
 
         # Use SDK shortcut which handles thinking tokens and mixed parts correctly
         function_calls = response.function_calls or []
