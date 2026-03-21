@@ -531,24 +531,25 @@ _DECLARATIONS = [
         name="tripletex_list_accounts",
         description=(
             "List chart-of-accounts entries (ledger accounts). "
-            "Use numberFrom/numberTo for range searches (e.g. 6000-6999 for all expense accounts). "
-            "Use number for exact match. Range search is preferred when exploring."
+            "The 'number' field supports PREFIX matching: number=65 returns all 65xx accounts, "
+            "number=12 returns all 12xx accounts. Use 2-digit prefixes for range-like searches. "
+            "Examples: number=65 for office/equipment expenses, number=69 for telecom, "
+            "number=71 for travel, number=12 for asset/depreciation accounts."
         ),
         parameters=_obj({
-            "number": _s("Filter by exact account number"),
-            "numberFrom": _s("Start of account number range (inclusive), e.g. '6000'"),
-            "numberTo": _s("End of account number range (inclusive), e.g. '6999'"),
+            "number": _s("Account number or 2-digit prefix for range search (e.g. '65' returns all 65xx accounts)"),
             "fields": _s("Fields to return, e.g. 'id,number,name'"),
         }),
     ),
 
     types.FunctionDeclaration(
         name="tripletex_list_vouchers",
-        description="List vouchers (bilag).",
+        description="List vouchers (bilag). Default returns up to 100 vouchers.",
         parameters=_obj({
             "dateFrom": _s("From date (YYYY-MM-DD)"),
             "dateTo": _s("To date (YYYY-MM-DD)"),
             "fields": _s("Fields to return"),
+            "count": _i("Max results (default 100)"),
         }),
     ),
 
@@ -556,14 +557,17 @@ _DECLARATIONS = [
         name="tripletex_create_voucher",
         description=(
             "Create a manual voucher (bilag) with debit/credit postings. "
+            "ALWAYS use this tool for vouchers — NEVER use tripletex_api_call for /ledger/voucher "
+            "(api_call does not set row numbers, causing row-0 422 errors). "
             "FORBIDDEN accounts (system-protected — will cause 422 guiRow-0 error): "
-            "bank/cash (1920, 1900), AR (1500), AP (2400), VAT (2700-2709), salary accounts. "
+            "bank/cash (1920, 1900), AR (1500), VAT (2700-2709). "
+            "Account 2400 (AP): allowed but REQUIRES supplier_id on the posting. "
             "For expenses/receipts: Debit expense account (6xxx) + specify vatType_id on that line; "
             "Credit accounts payable (2910 leverandørgjeld) or other liability (2990). "
+            "For employee expenses (reise/expense): include employee_id on the posting. "
             "For depreciation: Debit depreciation expense (6010/6020 etc.), "
-            "Credit accumulated depreciation (12x9 — search with tripletex_list_accounts). "
-            "NEVER manually post to VAT accounts — set vatType_id on the expense line instead. "
-            "Path reminder: this tool uses /ledger/voucher (the api_call path is also /ledger/voucher)."
+            "Credit accumulated depreciation (12x9 — search with tripletex_list_accounts number=12). "
+            "NEVER manually post to VAT accounts — set vatType_id on the expense line instead."
         ),
         parameters=_obj(
             {
@@ -579,6 +583,8 @@ _DECLARATIONS = [
                             "to VAT accounts. Find IDs via tripletex_api_call GET /ledger/vatType."
                         ),
                         "department_id": _i("Department ID to assign this posting to"),
+                        "supplier_id": _i("Supplier ID — REQUIRED when posting to AP account 2400 (leverandørgjeld)"),
+                        "employee_id": _i("Employee ID — required for employee-related expense postings (reise, personal expenses)"),
                     }),
                     desc="Debit/credit postings. Must balance (sum to zero).",
                 ),
@@ -753,7 +759,13 @@ def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
         })
     except TripletexError as bank_exc:
         logger.warning(f"Bank account auto-setup failed: {bank_exc}")
-        return None
+        # Return a clear STOP message so the model doesn't waste iterations retrying
+        raise TripletexError(
+            422,
+            "BLOCKED: Invoice creation requires a company bank account, but bank account "
+            "setup is blocked by the proxy (405). Do NOT retry invoice creation — it will "
+            "always fail. Complete any other parts of the task instead.",
+        )
 
 
 # ── Tool executor ──────────────────────────────────────────────────────────────
@@ -1129,10 +1141,8 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         case "tripletex_list_accounts":
             return client.get("/ledger/account", params=_none_stripped({
                 "number": args.get("number"),
-                "numberFrom": args.get("numberFrom"),
-                "numberTo": args.get("numberTo"),
                 "fields": args.get("fields", "id,number,name,description"),
-                "count": 50,
+                "count": 100,
             }))
 
         case "tripletex_list_vouchers":
@@ -1140,7 +1150,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "dateFrom": args.get("dateFrom"),
                 "dateTo": args.get("dateTo"),
                 "fields": args.get("fields", "id,date,description,postings"),
-                "count": 20,
+                "count": args.get("count", 100),
             })
 
         case "tripletex_create_voucher":
@@ -1153,6 +1163,8 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "description": p.get("description"),
                     "vatType": {"id": p["vatType_id"]} if p.get("vatType_id") else None,
                     "department": {"id": p["department_id"]} if p.get("department_id") else None,
+                    "supplier": {"id": p["supplier_id"]} if p.get("supplier_id") else None,
+                    "employee": {"id": p["employee_id"]} if p.get("employee_id") else None,
                 }))
             body = {"date": args["date"], "postings": postings}
             if args.get("description"):
@@ -1174,12 +1186,41 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             path = args["path"]
             params = args.get("params") or {}
             body = args.get("body") or {}
+
+            # Intercept POST /ledger/voucher — auto-add row numbers to prevent
+            # the "guiRow 0" 422 error that occurs when rows are missing.
+            if method == "POST" and path.rstrip("/") == "/ledger/voucher":
+                postings = body.get("postings") or []
+                for i, p in enumerate(postings, start=1):
+                    if not p.get("row"):
+                        p["row"] = i
+                body["postings"] = postings
+
+            # Intercept POST /employee/employment — strip fields that cause 422
+            if method == "POST" and path.rstrip("/") == "/employee/employment":
+                for bad_field in ("division", "percentageOfFullTimeEquivalent",
+                                  "positionPercentage", "positionCode", "annualSalary"):
+                    body.pop(bad_field, None)
+
+            # Intercept POST /employee/employment/details — auto-rename
+            # positionPercentage → percentageOfFullTimeEquivalent
+            if method == "POST" and "/employment/details" in path:
+                if "positionPercentage" in body and "percentageOfFullTimeEquivalent" not in body:
+                    body["percentageOfFullTimeEquivalent"] = body.pop("positionPercentage")
+                # Strip fields that don't belong on details endpoint
+                for bad_field in ("annualSalary", "positionCode"):
+                    body.pop(bad_field, None)
+
             match method:
                 case "GET":
                     return client.get(path, params=params)
                 case "POST":
                     return client.post(path, body)
                 case "PUT":
+                    # Intercept PUT /employee/employment/details too
+                    if "/employment/details" in path:
+                        if "positionPercentage" in (body or {}) and "percentageOfFullTimeEquivalent" not in (body or {}):
+                            body["percentageOfFullTimeEquivalent"] = body.pop("positionPercentage")
                     return client.put(path, body=body or None, params=params or None)
                 case "DELETE":
                     client.delete(path)

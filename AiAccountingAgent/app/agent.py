@@ -70,11 +70,13 @@ if the auto-fix also fails, in which case follow the error message guidance:
 • userType is handled automatically — do NOT set it via tripletex_api_call.
 
 ═══ EMPLOYMENT RECORDS ═══
-• POST /employee/employment — minimum body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}}
-• Do NOT include: division.id, percentageOfFullTimeEquivalent, positionPercentage, \
-  positionCode, annualSalary — all cause 422.
-• For details: POST /employee/employment/details with {{"employment":{{"id":EMP_ID}}, \
-  "date":"YYYY-MM-DD","percentageOfFullTimeEquivalent":100.0}}
+• Step 1: POST /employee/employment — body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}} \
+  Do NOT include division.id, percentageOfFullTimeEquivalent, positionPercentage, \
+  positionCode, annualSalary — ALL cause 422 on this endpoint.
+• Step 2 (if task requires position %): POST /employee/employment/details with body: \
+  {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD","percentageOfFullTimeEquivalent":100.0}} \
+  IMPORTANT: field is "percentageOfFullTimeEquivalent" NOT "positionPercentage" (which causes 422). \
+  Do NOT include annualSalary, positionCode on this endpoint either.
 • Never use PUT /employee/employment/{{id}} — always fails.
 
 ═══ INVOICING ═══
@@ -116,16 +118,28 @@ Chain: customer → product → order → invoice → [send] → [payment]
 7. Create order → invoice for billing.
 
 ═══ VOUCHERS (manual bookings) ═══
-• Use tripletex_create_voucher. Path = /ledger/voucher.
-• FORBIDDEN accounts (system-protected, cause 422): 1920, 1900, 1500, 2400, 2700-2709.
+• ALWAYS use tripletex_create_voucher — NEVER use tripletex_api_call for vouchers \
+  (api_call does NOT set row numbers, causing "guiRow 0" 422 errors).
+• FORBIDDEN accounts (system-protected, cause 422): 1920, 1900, 1500, 2700-2709.
+• Account 2400 (AP/leverandørgjeld): ALLOWED but requires supplier_id on the posting.
+• Employee expenses: include employee_id on expense postings when task involves an employee.
 • Expense: Debit 6xxx (with vatType_id) / Credit 2910.
-• Depreciation: Debit 6010/6020 / Credit 12x9.
-• ACCOUNT SEARCH: Use tripletex_list_accounts with numberFrom/numberTo for range queries: \
-  - Expense accounts: numberFrom=6000, numberTo=6999 \
-  - Depreciation accounts: numberFrom=1200, numberTo=1299 \
-  - Depreciation expense: numberFrom=6000, numberTo=6099 \
-  - Liability accounts: numberFrom=2900, numberTo=2999 \
-  Do NOT search exact numbers that might not exist. Always use range search first.
+• Depreciation: Debit 6010/6020 / Credit accumulated depreciation account. \
+  To find the accumulated depreciation account: \
+  a. tripletex_list_accounts(number="12") → returns ALL 12xx accounts \
+  b. Look for accounts ending in 9 (e.g. 1219, 1229, 1239, 1249, 1259) — these are \
+     accumulated depreciation. Match the asset type: \
+     1219=buildings, 1229=improvements, 1239=vehicles, 1249=inventory/furniture, 1259=machines. \
+  c. If no 12x9 account exists, credit the asset account directly (e.g. 1200, 1230, 1240). \
+  NEVER try individual exact account numbers (1249, 1259, etc.) one by one — always \
+  search with the 2-digit prefix "12" ONCE and pick from the results.
+• ACCOUNT SEARCH: Use tripletex_list_accounts with 2-digit PREFIX in number field: \
+  number=65 → all 65xx accounts, number=12 → all 12xx accounts. \
+  Examples: number=65 (office), number=69 (telecom), number=71 (travel), \
+  number=60 (depreciation expense), number=77 (bank fees), number=29 (liabilities), \
+  number=12 (assets/accumulated depreciation). \
+  NEVER search for exact 4-digit numbers that might not exist — always use 2-digit prefix first. \
+  ONE search with a 2-digit prefix gives you all accounts in that range — do NOT repeat searches.
 • Row numbers: start at 1 (0 is system-reserved). The tool sets rows automatically.
 • VAT: set vatType_id on expense line. Never post to VAT accounts directly.
 • GET /ledger/vatType to find VAT type IDs.
@@ -140,6 +154,13 @@ Chain: customer → product → order → invoice → [send] → [payment]
    "specifications":[{{"salaryType":{{"id":Y}},"rate":AMOUNT,"count":1.0}}]}}]}}
 • Field is "count" NOT "quantity". GET /salary/type to find salary type IDs.
 • Employee needs employment record first (POST /employee/employment).
+
+═══ MONTH-END CLOSING ═══
+• Salary accrual: if the task mentions an amount, use it. If no amount is given but the task \
+  says "accrue salaries", use the salary from employment details or estimate based on context. \
+  NEVER ask for more information — the task prompt contains everything you need.
+• Accrual reversal: Debit 1720 (prepaid) or Credit 2900 (accrued liabilities) depending on direction.
+• Always complete ALL steps described in the task — depreciation, accruals, reversals, etc.
 
 ═══ TRAVEL EXPENSES ═══
 • Create: tripletex_create_travel_expense(employee_id) — only employee_id on creation.
@@ -171,7 +192,7 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • FX invoice: GET /currency → create_order(currency_id) → create_invoice → register_payment
 • Supplier invoice: create_supplier → create_supplier_invoice
 • Project billing: list_activities → [create_activity] → link_to_project → log_hours → create_order → create_invoice
-• Depreciation: list_accounts(numberFrom=6000,numberTo=6099) + list_accounts(numberFrom=1200,numberTo=1299) → create_voucher
+• Depreciation: list_accounts(number=60) + list_accounts(number=12) → pick 6010/6020 + 12x9 → create_voucher
 • Credit note: list_invoices → create_credit_note
 • Travel expense: list_employees → create_travel_expense → add per_diem/costs
 • Delete travel: list_travel_expenses → delete_travel_expense
