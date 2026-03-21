@@ -189,7 +189,7 @@ CRITICAL RULES (every violation reduces your score):
     do NOT request account.number in fields — it causes 400 "number does not match PostingDTO". \
     Valid fields: id,date,description,amount,account,voucher,row. \
     To get account numbers, request fields=id,date,amount,account and then account returns \
-    an object with its own id — use a separate GET /ledger/account/{id} if needed.
+    an object with its own id — use a separate GET /ledger/account/{{id}} if needed.
 
 30. EMPLOYEE CREATION: department.id is REQUIRED when creating employees via POST /employee. \
     If the task doesn't specify a department, create one first (POST /department with any name), \
@@ -297,6 +297,9 @@ def run_agent(
             break
 
         model_content = response.candidates[0].content
+        if model_content is None:
+            logger.warning("Gemini returned candidate with no content (safety block?) — stopping.")
+            break
 
         # Use SDK shortcut which handles thinking tokens and mixed parts correctly
         function_calls = response.function_calls or []
