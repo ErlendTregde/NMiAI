@@ -76,9 +76,9 @@ CRITICAL RULES (every violation reduces your score):
 
 8. TODAY'S DATE: {today}
 
-9. PRODUCT NUMBERS: NEVER invent a product number. The 'number' field is not in \
-   the tool schema — Tripletex assigns it automatically. If the task mentions a \
-   specific product number, use tripletex_api_call to set it.
+9. PRODUCT NUMBERS: The 'number' field in tripletex_create_product is OPTIONAL. \
+   ONLY set it if the task explicitly provides a specific product number. \
+   NEVER invent product numbers — omit the field if not specified by the task.
 
 10. PAYMENT FIELDS: tripletex_register_payment uses these exact fields: \
     invoice_id, paymentDate (YYYY-MM-DD), amount (number), paymentTypeId (1=bank transfer).
@@ -142,6 +142,8 @@ CRITICAL RULES (every violation reduces your score):
     Required fields: supplier_id, invoiceDate, amountCurrency. \
     Do NOT pass dueDate — that field does not exist on /supplierInvoice and causes 422. \
     Do NOT use tripletex_create_voucher for supplier invoices — use the dedicated tool. \
+    CURRENCY: For NOK invoices, do NOT set currency_code (leave it out). \
+    For foreign currency, set currency_code to e.g. "EUR" — the tool handles the factor. \
     Flow: tripletex_create_supplier → tripletex_create_supplier_invoice.
 
 22. DEPRECIATION TASK (avskrivning): Debit depreciation expense account (6010, 6020 etc.), \
@@ -162,20 +164,30 @@ CRITICAL RULES (every violation reduces your score):
 
 25. COMPANY BANK ACCOUNT (required before invoice creation or payment in fresh sandbox): \
     If invoice creation fails with "bankkontonummer" error OR payment returns unexpected 404: \
-    a. tripletex_api_call GET /company?fields=id,version → take values[0] for company id+version \
-       (DO NOT use /token/session/whoAmI — that endpoint returns 405 through this proxy) \
-    b. tripletex_api_call PUT /company/{{companyId}} body: \
+    a. tripletex_api_call GET /employee/entitlement → take values[0].customer.id = companyId \
+       (DO NOT use GET /company list — returns 405. Use entitlement response to find company ID.) \
+    b. tripletex_api_call GET /company/{{companyId}}?fields=id,version → get version number \
+    c. tripletex_api_call PUT /company/{{companyId}} body: \
        {{"id": X, "version": Y, "bankAccountNumber": "12345678903"}} \
     Norwegian account numbers: 11 digits. Use "12345678903" as dummy if none given. \
+    If PUT /company/{{companyId}} also returns 405, the proxy blocks this endpoint — \
+    skip bank account setup and accept invoicing will fail for this submission. \
     Then retry the failed operation. This is a one-time setup per submission.
 
 26. EMPLOYEE EMPLOYMENT RECORD (required for salary/payroll tasks): \
     Path is POST /employee/employment (NOT /employee/{{id}}/employment — that returns 404). \
     Minimum body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}} \
-    Do NOT include: percentageOfFullTimeEquivalent, positionPercentage, employmentStartDate \
-    — all of these cause 422 "Feltet eksisterer ikke". Only employee and startDate are needed. \
-    Create the employment record BEFORE running payroll if the error says \
-    "ikke registrert med et arbeidsforhold i perioden" (not registered with employment in period).
+    Do NOT include on this endpoint: percentageOfFullTimeEquivalent, positionPercentage, \
+    positionCode, annualSalary, yearlySalary — all cause 422 "Feltet eksisterer ikke". \
+    Create employment BEFORE running payroll if error says "ikke registrert med et arbeidsforhold". \
+    \
+    For employment DETAILS (position %, type — only if task specifically requires it): \
+    POST /employee/employment/details (NOT PUT /employee/employment/{{id}}): \
+    body: {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD", \
+           "percentageOfFullTimeEquivalent":100.0}} \
+    Path /employee/employment/employmentDetails does NOT exist (returns 405 — wrong path). \
+    NEVER use PUT /employee/employment/{{id}} to set position details — always fails. \
+    NEVER set salary via employment — salary is POST /salary/transaction (rule 16).
 
 27. LIST SUPPLIER INVOICES: GET /supplierInvoice requires invoiceDateFrom and invoiceDateTo. \
     Always pass a date range. Also: isPaid is NOT a valid filter field for SupplierInvoiceDTO.
@@ -195,7 +207,10 @@ CRITICAL RULES (every violation reduces your score):
     If the task doesn't specify a department, create one first (POST /department with any name), \
     then use that department_id when creating the employee. \
     If employee creation fails with "email already exists", search for the employee \
-    with tripletex_list_employees (by name or email) instead of retrying creation.
+    with tripletex_list_employees (by name or email) instead of retrying creation. \
+    PRODUCTS: If product creation fails with "already registered" (allerede registrert), \
+    the product already exists — search with tripletex_list_products(name=...) and use \
+    the existing product's ID instead of retrying creation.
 
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)

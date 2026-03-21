@@ -99,6 +99,9 @@ _DECLARATIONS = [
                 "phoneNumberMobile": _s("Mobile phone number"),
                 "phoneNumberHome": _s("Home phone number"),
                 "phoneNumberWork": _s("Work phone number"),
+                "dateOfBirth": _s("Date of birth (YYYY-MM-DD) — from employment contract"),
+                "nationalIdentityNumber": _s("Norwegian national identity number / personnummer — from employment contract"),
+                "bankAccountNumber": _s("Employee's personal bank account number — from employment contract"),
             },
             required=["firstName", "lastName"],
         ),
@@ -142,6 +145,9 @@ _DECLARATIONS = [
                 "phoneNumberMobile": _s("Mobile phone"),
                 "phoneNumberHome": _s("Home phone"),
                 "phoneNumberWork": _s("Work phone"),
+                "dateOfBirth": _s("Date of birth (YYYY-MM-DD)"),
+                "nationalIdentityNumber": _s("Norwegian national identity number / personnummer"),
+                "bankAccountNumber": _s("Employee's personal bank account number"),
             },
             required=["id", "version"],
         ),
@@ -250,15 +256,16 @@ _DECLARATIONS = [
         name="tripletex_create_product",
         description=(
             "Create a new product. "
-            "Do NOT supply a product number — Tripletex auto-assigns one. "
-            "Only set vatTypeId=3 for standard 25% Norwegian VAT."
+            "The 'number' field is optional — only set it if the task explicitly gives a specific product number. "
+            "For non-standard VAT rates (15%, 0%, etc.) query GET /ledger/vatType to find the correct vatTypeId."
         ),
         parameters=_obj(
             {
                 "name": _s("Product name"),
+                "number": _s("Product number — ONLY set if the task explicitly provides a specific number. Omit to let Tripletex auto-assign."),
                 "priceExcludingVatCurrency": _n("Sales price excluding VAT"),
                 "costExcludingVatCurrency": _n("Cost price excluding VAT"),
-                "vatTypeId": _i("VAT type ID. Use 3 for standard 25% Norwegian VAT."),
+                "vatTypeId": _i("VAT type ID. 3 = standard 25% Norwegian VAT. Query GET /ledger/vatType for other rates."),
             },
             required=["name"],
         ),
@@ -662,6 +669,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "phoneNumberMobile": args.get("phoneNumberMobile"),
                 "phoneNumberHome": args.get("phoneNumberHome"),
                 "phoneNumberWork": args.get("phoneNumberWork"),
+                "dateOfBirth": args.get("dateOfBirth"),
+                "nationalIdentityNumber": args.get("nationalIdentityNumber"),
+                "bankAccountNumber": args.get("bankAccountNumber"),
             }))
 
         case "tripletex_grant_entitlement":
@@ -682,6 +692,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "phoneNumberMobile": args.get("phoneNumberMobile"),
                 "phoneNumberHome": args.get("phoneNumberHome"),
                 "phoneNumberWork": args.get("phoneNumberWork"),
+                "dateOfBirth": args.get("dateOfBirth"),
+                "nationalIdentityNumber": args.get("nationalIdentityNumber"),
+                "bankAccountNumber": args.get("bankAccountNumber"),
             }))
 
         # ── Suppliers ─────────────────────────────────────────────────────────
@@ -703,8 +716,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "supplier": {"id": args["supplier_id"]},
                 "amountCurrency": args.get("amountCurrency"),
                 "amountExcludingVatCurrency": args.get("amountExcludingVatCurrency"),
-                # factor must be >= 1; code alone defaults factor to 0 which causes 422
-                "currency": {"code": currency_code, "factor": 1},
+                # Omit currency for NOK (Tripletex default) — sending it causes 500.
+                # For foreign currencies, include with the exchange rate factor.
+                "currency": {"code": currency_code, "factor": 1} if currency_code != "NOK" else None,
                 "invoiceNumber": args.get("invoiceNumber"),
                 "kid": args.get("kid"),
                 "description": args.get("description"),
