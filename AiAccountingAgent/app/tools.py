@@ -529,9 +529,15 @@ _DECLARATIONS = [
 
     types.FunctionDeclaration(
         name="tripletex_list_accounts",
-        description="List chart-of-accounts entries (ledger accounts).",
+        description=(
+            "List chart-of-accounts entries (ledger accounts). "
+            "Use numberFrom/numberTo for range searches (e.g. 6000-6999 for all expense accounts). "
+            "Use number for exact match. Range search is preferred when exploring."
+        ),
         parameters=_obj({
-            "number": _s("Filter by account number"),
+            "number": _s("Filter by exact account number"),
+            "numberFrom": _s("Start of account number range (inclusive), e.g. '6000'"),
+            "numberTo": _s("End of account number range (inclusive), e.g. '6999'"),
             "fields": _s("Fields to return, e.g. 'id,number,name'"),
         }),
     ),
@@ -1121,11 +1127,13 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Ledger ────────────────────────────────────────────────────────────
 
         case "tripletex_list_accounts":
-            return client.get("/ledger/account", params={
+            return client.get("/ledger/account", params=_none_stripped({
                 "number": args.get("number"),
+                "numberFrom": args.get("numberFrom"),
+                "numberTo": args.get("numberTo"),
                 "fields": args.get("fields", "id,number,name,description"),
                 "count": 50,
-            })
+            }))
 
         case "tripletex_list_vouchers":
             return client.get("/ledger/voucher", params={

@@ -86,6 +86,10 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Payment: tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1). \
   Payment 404 is auto-fixed. Do NOT try to set up bank accounts for payment errors.
 • Credit note: tripletex_create_credit_note(invoice_id, date). Never DELETE invoices.
+• REVERSE/UNDO PAYMENT: There is NO GET /invoice/{{id}}/payment endpoint (returns 404). \
+  There is NO GET /invoice/payment endpoint (returns 422). \
+  To reverse a payment or undo an invoice: use tripletex_create_credit_note(invoice_id, date). \
+  This creates a kreditnota that reverses both the invoice and any associated payment.
 • Foreign currency: GET /currency?code=EUR → pass currency_id to tripletex_create_order. \
   Never set exchangeRate manually. Register payment in invoice currency amount.
 
@@ -115,11 +119,20 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Use tripletex_create_voucher. Path = /ledger/voucher.
 • FORBIDDEN accounts (system-protected, cause 422): 1920, 1900, 1500, 2400, 2700-2709.
 • Expense: Debit 6xxx (with vatType_id) / Credit 2910.
-• Depreciation: Debit 6010/6020 / Credit 12x9. Search with tripletex_list_accounts(number=12) \
-  to find available 12xx accounts. Fixed asset accounts (1200,1210,1220,1230) are protected.
+• Depreciation: Debit 6010/6020 / Credit 12x9.
+• ACCOUNT SEARCH: Use tripletex_list_accounts with numberFrom/numberTo for range queries: \
+  - Expense accounts: numberFrom=6000, numberTo=6999 \
+  - Depreciation accounts: numberFrom=1200, numberTo=1299 \
+  - Depreciation expense: numberFrom=6000, numberTo=6099 \
+  - Liability accounts: numberFrom=2900, numberTo=2999 \
+  Do NOT search exact numbers that might not exist. Always use range search first.
 • Row numbers: start at 1 (0 is system-reserved). The tool sets rows automatically.
 • VAT: set vatType_id on expense line. Never post to VAT accounts directly.
 • GET /ledger/vatType to find VAT type IDs.
+• Common account numbers: 6300=leie (rent), 6340=lys/varme (utilities), \
+  6500=kontorutstyr (office supplies), 6800=kontorrekvisita (office equipment), \
+  6900=telefon (phone), 7770=bankgebyr (bank fees), 8050=rentekostnad (interest expense), \
+  2910=leverandørgjeld (AP), 2990=annen kortsiktig gjeld (other current liabilities).
 
 ═══ SALARY ═══
 • NEVER use vouchers for salary. Use tripletex_api_call POST /salary/transaction:
@@ -141,6 +154,9 @@ Chain: customer → product → order → invoice → [send] → [payment]
 
 ═══ API RULES ═══
 • Paths: NEVER prefix with /v2/. Use /employee NOT /v2/employee.
+• NON-EXISTENT ENDPOINTS (cause 404/422 — NEVER use these): \
+  /invoice/{{id}}/payment, /invoice/payment, /employee/{{id}}/loggedInUser, \
+  /employee/employment/employmentDetails, /v2/ledger/account, /v2/currency.
 • Listing: invoices require invoiceDateFrom + invoiceDateTo.
 • Invalid list fields: dueDate, isPaid, amountOutstanding (cause 400).
 • Ledger postings: do NOT request account.number (causes 400).
@@ -155,7 +171,7 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • FX invoice: GET /currency → create_order(currency_id) → create_invoice → register_payment
 • Supplier invoice: create_supplier → create_supplier_invoice
 • Project billing: list_activities → [create_activity] → link_to_project → log_hours → create_order → create_invoice
-• Depreciation: list_accounts(number=60) + list_accounts(number=12) → create_voucher
+• Depreciation: list_accounts(numberFrom=6000,numberTo=6099) + list_accounts(numberFrom=1200,numberTo=1299) → create_voucher
 • Credit note: list_invoices → create_credit_note
 • Travel expense: list_employees → create_travel_expense → add per_diem/costs
 • Delete travel: list_travel_expenses → delete_travel_expense
@@ -242,6 +258,10 @@ def run_agent(
             break
 
         if not response.candidates:
+            if iteration < 2:
+                logger.warning(f"Gemini returned no candidates on iteration {iteration} — retrying.")
+                time.sleep(1)
+                continue
             logger.warning("Gemini returned no candidates — stopping loop.")
             break
 
@@ -285,6 +305,20 @@ def run_agent(
                 logger.info(f"Model text: {part.text[:300]}")
 
         if not function_calls:
+            if iteration < 2:
+                # Model returned text but no tools — nudge it to actually act
+                logger.warning(
+                    f"No tool calls on iteration {iteration} — nudging model to use tools."
+                )
+                contents.append(model_content)
+                contents.append(types.Content(role="user", parts=[
+                    types.Part(text=(
+                        "You MUST use the available Tripletex API tools to complete this task. "
+                        "Do not just describe what to do — execute the necessary API calls NOW. "
+                        "Start with the first required tool call."
+                    ))
+                ]))
+                continue
             logger.info(
                 f"Agent finished after {iteration + 1} Gemini call(s) — "
                 f"no tool calls in response."
