@@ -278,8 +278,11 @@ _DECLARATIONS = [
 
     types.FunctionDeclaration(
         name="tripletex_list_invoices",
-        description="List invoices.",
+        description="List invoices. invoiceDateFrom and invoiceDateTo are REQUIRED by the API.",
         parameters=_obj({
+            "invoiceDateFrom": _s("Start date filter (YYYY-MM-DD) — REQUIRED"),
+            "invoiceDateTo": _s("End date filter (YYYY-MM-DD) — REQUIRED"),
+            "customerId": _i("Filter by customer ID — optional"),
             "fields": _s("Fields to return"),
             "count": _i("Max number of results"),
         }),
@@ -691,10 +694,13 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             return client.post("/invoice", body)
 
         case "tripletex_list_invoices":
-            return client.get("/invoice", params={
-                "fields": args.get("fields", "id,invoiceDate,invoiceDueDate,amountCurrency,customer"),
+            return client.get("/invoice", params=_none_stripped({
+                "invoiceDateFrom": args.get("invoiceDateFrom", "2020-01-01"),
+                "invoiceDateTo": args.get("invoiceDateTo", "2030-12-31"),
+                "customerId": args.get("customerId"),
+                "fields": args.get("fields", "id,invoiceDate,invoiceDueDate,amountCurrency,customer,amount"),
                 "count": args.get("count", 10),
-            })
+            }))
 
         case "tripletex_send_invoice":
             params: dict = {"sendType": args["sendType"]}
