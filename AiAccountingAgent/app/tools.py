@@ -165,6 +165,31 @@ _DECLARATIONS = [
         ),
     ),
 
+    types.FunctionDeclaration(
+        name="tripletex_create_supplier_invoice",
+        description=(
+            "Register an incoming supplier invoice (leverandørfaktura / inngående faktura). "
+            "Use when the task says 'register invoice from supplier', 'book incoming invoice', "
+            "'registrer leverandørfaktura', or similar. "
+            "This creates the invoice in Tripletex and auto-generates the AP accounting entries. "
+            "After creating, you can approve it via tripletex_api_call PUT /supplierInvoice/{id}/:approve."
+        ),
+        parameters=_obj(
+            {
+                "supplier_id": _i("Supplier ID (create supplier first if needed)"),
+                "invoiceDate": _s("Invoice date (YYYY-MM-DD)"),
+                "dueDate": _s("Payment due date (YYYY-MM-DD)"),
+                "amountCurrency": _n("Total invoice amount including VAT"),
+                "amountExcludingVatCurrency": _n("Amount excluding VAT — optional"),
+                "currency_code": _s("Currency code, e.g. 'NOK', 'EUR', 'USD' — defaults to NOK"),
+                "invoiceNumber": _s("Supplier's invoice number — optional"),
+                "kid": _s("Payment reference / KID number — optional"),
+                "description": _s("Description / comment — optional"),
+            },
+            required=["supplier_id", "invoiceDate", "amountCurrency"],
+        ),
+    ),
+
     # ── Customers ─────────────────────────────────────────────────────────────
 
     types.FunctionDeclaration(
@@ -495,18 +520,33 @@ _DECLARATIONS = [
 
     types.FunctionDeclaration(
         name="tripletex_create_voucher",
-        description="Create a voucher (bilag) with debit/credit postings.",
+        description=(
+            "Create a manual voucher (bilag) with debit/credit postings. "
+            "FORBIDDEN accounts (system-protected — will cause 422 guiRow-0 error): "
+            "bank/cash (1920, 1900), AR (1500), AP (2400), VAT (2700-2709), salary accounts. "
+            "For expenses/receipts: Debit expense account (6xxx) + specify vatType_id on that line; "
+            "Credit accounts payable (2910 leverandørgjeld) or other liability (2990). "
+            "For depreciation: Debit depreciation expense (6010/6020 etc.), "
+            "Credit accumulated depreciation (12x9 — search with tripletex_list_accounts). "
+            "NEVER manually post to VAT accounts — set vatType_id on the expense line instead. "
+            "Path reminder: this tool uses /ledger/voucher (the api_call path is also /ledger/voucher)."
+        ),
         parameters=_obj(
             {
                 "date": _s("Voucher date (YYYY-MM-DD)"),
                 "description": _s("Description"),
                 "postings": _arr(
                     _obj({
-                        "account_id": _i("Ledger account ID"),
+                        "account_id": _i("Ledger account ID (from tripletex_list_accounts)"),
                         "amount": _n("Amount (positive = debit, negative = credit)"),
                         "description": _s("Posting description"),
+                        "vatType_id": _i(
+                            "VAT type ID — set this on expense lines instead of posting manually "
+                            "to VAT accounts. Find IDs via tripletex_api_call GET /ledger/vatType."
+                        ),
+                        "department_id": _i("Department ID to assign this posting to"),
                     }),
-                    desc="Debit/credit postings",
+                    desc="Debit/credit postings. Must balance (sum to zero).",
                 ),
             },
             required=["date", "postings"],
@@ -647,6 +687,21 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "phoneNumber": args.get("phoneNumber"),
                 "isSupplier": True,
             }))
+
+        case "tripletex_create_supplier_invoice":
+            currency_code = args.get("currency_code") or "NOK"
+            body = _none_stripped({
+                "invoiceDate": args.get("invoiceDate"),
+                "dueDate": args.get("dueDate"),
+                "supplier": {"id": args["supplier_id"]},
+                "amountCurrency": args.get("amountCurrency"),
+                "amountExcludingVatCurrency": args.get("amountExcludingVatCurrency"),
+                "currency": {"code": currency_code},
+                "invoiceNumber": args.get("invoiceNumber"),
+                "kid": args.get("kid"),
+                "description": args.get("description"),
+            })
+            return client.post("/supplierInvoice", body)
 
         # ── Customers ─────────────────────────────────────────────────────────
 
@@ -877,6 +932,8 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "account": {"id": p["account_id"]},
                     "amount": p.get("amount"),
                     "description": p.get("description"),
+                    "vatType": {"id": p["vatType_id"]} if p.get("vatType_id") else None,
+                    "department": {"id": p["department_id"]} if p.get("department_id") else None,
                 }))
             body = {"date": args["date"], "postings": postings}
             if args.get("description"):

@@ -121,15 +121,42 @@ CRITICAL RULES (every violation reduces your score):
 
 19. FX/CURRENCY PAYMENT: When registering payment in a foreign currency, use \
     tripletex_register_payment with the RECEIVED amount. Tripletex auto-books the exchange \
-    rate difference — do NOT create manual vouchers for currency gain/loss. \
-    Postings on system-generated rows (row 0, AR accounts) cannot be manually created.
+    rate difference — do NOT create manual vouchers for currency gain/loss.
+
+20. MANUAL VOUCHERS (tripletex_create_voucher): \
+    SYSTEM-PROTECTED accounts that CANNOT be in postings (causes "guiRow 0 systemgenererte" 422): \
+    bank/cash (1920, 1900), AR (1500), AP (2400), VAT accounts (2700-2709). \
+    For expense/receipt vouchers: Debit expense account (6xxx) with vatType_id; \
+    Credit accounts payable (2910) or other liability (2990). \
+    For depreciation: Debit depreciation expense (6010/6020/etc.), Credit 12x9 account. \
+    NEVER post to VAT accounts manually — use vatType_id on the expense line instead. \
+    When using tripletex_api_call for a voucher: path is /ledger/voucher (NOT /voucher).
+
+21. SUPPLIER INVOICES: Use tripletex_create_supplier_invoice to register an incoming invoice. \
+    Required fields: supplier_id, invoiceDate, amountCurrency. \
+    Do NOT use tripletex_create_voucher for supplier invoices — use the dedicated tool. \
+    Flow: tripletex_create_supplier → tripletex_create_supplier_invoice.
+
+22. DEPRECIATION TASK (avskrivning): Debit depreciation expense account (6010, 6020 etc.), \
+    Credit the accumulated depreciation account (12x9 — typically 1219 for fixtures, \
+    1229 for machinery, 1239 for vehicles). \
+    If account 1209 doesn't exist, search: tripletex_list_accounts with number=12 \
+    to find all accounts starting with 12 and pick the matching 12x9 account. \
+    Fixed asset accounts (1200, 1210, 1220, 1230) are system-protected — do NOT use as credit. \
+    Prepaid expense accounts (1700-series) may also be system-protected.
+
+23. VAT TYPES: To find VAT type IDs: tripletex_api_call GET /ledger/vatType \
+    Common: incoming VAT 25% ≈ id 3 or 4. Use GET /ledger/vatType to confirm.
 
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer
 • Create supplier → tripletex_create_supplier (NOT tripletex_create_customer)
+• Create incoming invoice → tripletex_create_supplier → tripletex_create_supplier_invoice
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
 • Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1)
+• Expense/receipt voucher → tripletex_create_voucher(debit=6xxx with vatType_id, credit=2910)
+• Depreciation → tripletex_create_voucher(debit=6010, credit=12x9)
 • Travel expense → tripletex_create_travel_expense(employee_id) → then api_call \
   POST /travelExpense/{{id}}/perDiemCompensation for per-diem with dates
 • Delete travel expense → GET /travelExpense → DELETE /travelExpense/{{id}}
