@@ -177,8 +177,10 @@ Chain: customer → product → order → invoice → [send] → [payment]
 
 ═══ TRAVEL EXPENSES ═══
 • Create: tripletex_create_travel_expense(employee_id) — only employee_id on creation.
-• Add details via: POST /travelExpense/{{id}}/perDiemCompensation or /cost.
+• Sub-resource endpoints (/travelExpense/{{id}}/perDiemCompensation, /cost) may return 404. \
+  If they fail: just create the travel expense container — do NOT retry sub-resources.
 • Delete: GET /travelExpense → DELETE /travelExpense/{{id}}.
+• List fields: only use "id,employee,status" — travelToDate/travelFromDate do NOT exist.
 
 ═══ BANK RECONCILIATION (Tier 3) ═══
 • Read CSV: identify date, description, amount, reference per row.

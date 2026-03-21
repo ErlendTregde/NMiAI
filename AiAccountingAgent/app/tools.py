@@ -806,7 +806,15 @@ def execute_tool(client: TripletexClient, name: str, args: dict) -> dict:
         return {"success": True, "data": result}
     except TripletexError as exc:
         logger.warning(f"Tool {name} → Tripletex error: {exc.to_agent_message()}")
-        return {"success": False, "error": exc.to_agent_message()}
+        msg = exc.to_agent_message()
+        # Make 403 errors unmistakable — model must stop immediately
+        if exc.status_code == 403:
+            msg = (
+                "FATAL: Session token expired or invalid (403 Forbidden). "
+                "ALL further API calls will fail. STOP IMMEDIATELY — do not make "
+                "any more tool calls. The task cannot be completed."
+            )
+        return {"success": False, "error": msg}
     except Exception as exc:
         logger.error(f"Tool {name} → unexpected error: {exc}", exc_info=True)
         return {"success": False, "error": str(exc)}
@@ -835,12 +843,28 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_employee":
+            # Auto-create department if none provided (Tripletex requires it)
+            dept_id = args.get("departmentId")
+            if not dept_id:
+                try:
+                    dept_resp = client.post("/department", {"name": "Generell"})
+                    dept_id = dept_resp["value"]["id"]
+                    logger.info(f"Auto-created department 'Generell' (ID={dept_id})")
+                except TripletexError:
+                    # Department might already exist — try to find it
+                    try:
+                        depts = client.get("/department", params={"fields": "id,name", "count": 5})
+                        values = (depts or {}).get("values", [])
+                        if values:
+                            dept_id = values[0]["id"]
+                    except TripletexError:
+                        pass
             emp_body = _none_stripped({
                 "firstName": args.get("firstName"),
                 "lastName": args.get("lastName"),
                 "email": args.get("email"),
                 "userType": args.get("userTypeId", 1),
-                "department": {"id": args["departmentId"]} if args.get("departmentId") else None,
+                "department": {"id": dept_id} if dept_id else None,
                 "employeeNumber": args.get("employeeNumber"),
                 "phoneNumberMobile": args.get("phoneNumberMobile"),
                 "phoneNumberHome": args.get("phoneNumberHome"),
@@ -897,7 +921,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             invoice_date = args.get("invoiceDate")
             body = _none_stripped({
                 "invoiceDate": invoice_date,
-                "voucherDate": invoice_date,  # Required for auto-generated voucher
+                # NOTE: voucherDate does NOT exist on supplierInvoice — never send it
                 "supplier": {"id": args["supplier_id"]},
                 "amountCurrency": args.get("amountCurrency"),
                 # Omit currency for NOK (Tripletex default) — sending it causes 500.
@@ -914,7 +938,6 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     logger.warning("Supplier invoice 500 — retrying with minimal body")
                     minimal_body = {
                         "invoiceDate": invoice_date,
-                        "voucherDate": invoice_date,
                         "supplier": {"id": args["supplier_id"]},
                         "amountCurrency": args.get("amountCurrency"),
                     }
@@ -1088,7 +1111,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
 
         case "tripletex_list_travel_expenses":
             return client.get("/travelExpense", params={
-                "fields": args.get("fields", "id,description,employee,travelFromDate,travelToDate"),
+                "fields": args.get("fields", "id,employee,status"),
                 "count": args.get("count", 10),
             })
 
