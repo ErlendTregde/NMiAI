@@ -186,9 +186,8 @@ _DECLARATIONS = [
             {
                 "supplier_id": _i("Supplier ID (create supplier first if needed)"),
                 "invoiceDate": _s("Invoice date (YYYY-MM-DD)"),
-                "amountCurrency": _n("Total invoice amount including VAT"),
-                "amountExcludingVatCurrency": _n("Amount excluding VAT — optional"),
-                "currency_code": _s("Currency code, e.g. 'NOK', 'EUR', 'USD' — defaults to NOK"),
+                "amountCurrency": _n("Total invoice amount INCLUDING VAT. Do NOT compute or pass amountExcludingVatCurrency — send only the total."),
+                "currency_code": _s("Currency code, e.g. 'NOK', 'EUR', 'USD' — defaults to NOK. Omit for NOK."),
                 "invoiceNumber": _s("Supplier's invoice number — optional"),
                 "kid": _s("Payment reference / KID number — optional"),
             },
@@ -712,16 +711,14 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             currency_code = args.get("currency_code") or "NOK"
             body = _none_stripped({
                 "invoiceDate": args.get("invoiceDate"),
-                # dueDate does not exist on /supplierInvoice — omitted
+                # dueDate, description, amountExcludingVatCurrency: do NOT exist or cause 500 — omitted
                 "supplier": {"id": args["supplier_id"]},
                 "amountCurrency": args.get("amountCurrency"),
-                "amountExcludingVatCurrency": args.get("amountExcludingVatCurrency"),
                 # Omit currency for NOK (Tripletex default) — sending it causes 500.
                 # For foreign currencies, include with the exchange rate factor.
                 "currency": {"code": currency_code, "factor": 1} if currency_code != "NOK" else None,
                 "invoiceNumber": args.get("invoiceNumber"),
                 "kid": args.get("kid"),
-                # description does NOT exist on /supplierInvoice — omitted
             })
             return client.post("/supplierInvoice", body)
 

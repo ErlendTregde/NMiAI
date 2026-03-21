@@ -140,11 +140,13 @@ CRITICAL RULES (every violation reduces your score):
     The tripletex_create_voucher tool sets row automatically; use it instead of api_call for vouchers.
 
 21. SUPPLIER INVOICES: Use tripletex_create_supplier_invoice to register an incoming invoice. \
-    Required fields: supplier_id, invoiceDate, amountCurrency. \
-    INVALID fields (cause 422): dueDate, description — both do NOT exist on /supplierInvoice. \
-    Do NOT use tripletex_create_voucher for supplier invoices — use the dedicated tool. \
-    CURRENCY: For NOK invoices, do NOT set currency_code. \
-    For foreign currency invoices, set currency_code to e.g. "EUR". \
+    Required fields: supplier_id, invoiceDate, amountCurrency (total INCLUDING VAT). \
+    INVALID / causes 500 or 422: dueDate, description, amountExcludingVatCurrency — NEVER include these. \
+    ONLY send: supplier_id, invoiceDate, amountCurrency, invoiceNumber (optional), kid (optional). \
+    CURRENCY: For NOK invoices, do NOT set currency_code. For foreign: set currency_code to "EUR" etc. \
+    If POST /supplierInvoice returns 500: do NOT fall back to vouchers (wrong entity, wrong score). \
+    Do NOT try bank account setup when supplier invoice returns 500 — it is unrelated. \
+    Just retry once with exactly the same minimal body; if it fails again, stop. \
     Flow: tripletex_create_supplier → tripletex_create_supplier_invoice.
 
 22. DEPRECIATION TASK (avskrivning): Debit depreciation expense account (6010, 6020 etc.), \
@@ -176,19 +178,27 @@ CRITICAL RULES (every violation reduces your score):
     Then retry the failed operation. This is a one-time setup per submission.
 
 26. EMPLOYEE EMPLOYMENT RECORD (required for salary/payroll tasks): \
-    Path is POST /employee/employment (NOT /employee/{{id}}/employment — that returns 404). \
-    Minimum body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}} \
-    Do NOT include on this endpoint: percentageOfFullTimeEquivalent, positionPercentage, \
-    positionCode, annualSalary, yearlySalary — all cause 422 "Feltet eksisterer ikke". \
-    Create employment BEFORE running payroll if error says "ikke registrert med et arbeidsforhold". \
+    STEP 1 — ALWAYS get division/company ID first: \
+    tripletex_api_call GET /employee/entitlement → divisionId = values[0].customer.id \
+    (Required to link employment to the legal entity — without it salary fails with \
+    "Arbeidsforholdet er ikke knyttet mot en virksomhet".) \
     \
-    For employment DETAILS (position %, type — only if task specifically requires it): \
+    STEP 2 — Create employment: POST /employee/employment \
+    Body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD","division":{{"id":divisionId}}}} \
+    Do NOT include: percentageOfFullTimeEquivalent, positionPercentage, positionCode, \
+    annualSalary, yearlySalary — all cause 422 "Feltet eksisterer ikke". \
+    \
+    STEP 3 — Employment DETAILS (position % — only if task requires it): \
     POST /employee/employment/details (NOT PUT /employee/employment/{{id}}): \
     body: {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD", \
            "percentageOfFullTimeEquivalent":100.0}} \
     Path /employee/employment/employmentDetails does NOT exist (returns 405 — wrong path). \
     NEVER use PUT /employee/employment/{{id}} to set position details — always fails. \
-    NEVER set salary via employment — salary is POST /salary/transaction (rule 16).
+    \
+    SALARY: POST /salary/transaction is for running payroll (pays the employee). \
+    Use it only if the task says "run payroll", "register payslip" or "process salary". \
+    For employment CONTRACT tasks, configure salary type but do NOT run a salary transaction. \
+    If running salary, the year/month MUST match an active employment period (not a future start date).
 
 27. LIST SUPPLIER INVOICES: GET /supplierInvoice requires invoiceDateFrom and invoiceDateTo. \
     Always pass a date range. Also: isPaid is NOT a valid filter field for SupplierInvoiceDTO.
@@ -229,6 +239,7 @@ CRITICAL RULES (every violation reduces your score):
 
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
+• Create employment → GET /employee/entitlement (divisionId) → POST /employee/employment with division
 • Create customer → POST /customer
 • Create supplier → tripletex_create_supplier (NOT tripletex_create_customer)
 • Create incoming invoice → tripletex_create_supplier → tripletex_create_supplier_invoice
