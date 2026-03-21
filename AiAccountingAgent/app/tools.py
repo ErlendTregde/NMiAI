@@ -128,7 +128,9 @@ _DECLARATIONS = [
         name="tripletex_update_employee",
         description=(
             "Update an existing employee. "
-            "Requires the current version number — GET the employee first to obtain it."
+            "Requires the current version number — GET the employee first to obtain it. "
+            "INVALID fields (cause 422): annualSalary, salary, wage — salary is handled via "
+            "/salary/transaction, NOT via the employee record."
         ),
         parameters=_obj(
             {
@@ -323,12 +325,16 @@ _DECLARATIONS = [
 
     types.FunctionDeclaration(
         name="tripletex_list_invoices",
-        description="List invoices. invoiceDateFrom and invoiceDateTo are REQUIRED by the API.",
+        description=(
+            "List invoices. invoiceDateFrom and invoiceDateTo are REQUIRED by the API. "
+            "INVALID fields (cause 400): dueDate, isPaid, amountOutstanding — do NOT request these. "
+            "Valid fields: id, invoiceDate, customer, amountCurrency, amountOutstandingCurrency, invoiceNumber."
+        ),
         parameters=_obj({
             "invoiceDateFrom": _s("Start date filter (YYYY-MM-DD) — REQUIRED"),
             "invoiceDateTo": _s("End date filter (YYYY-MM-DD) — REQUIRED"),
             "customerId": _i("Filter by customer ID — optional"),
-            "fields": _s("Fields to return"),
+            "fields": _s("Fields to return. AVOID: dueDate, isPaid, amountOutstanding (cause 400)"),
             "count": _i("Max number of results"),
         }),
     ),

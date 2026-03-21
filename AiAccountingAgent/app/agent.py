@@ -106,11 +106,14 @@ CRITICAL RULES (every violation reduces your score):
 
 16. SALARY/PAYROLL TASKS: NEVER use tripletex_create_voucher for salary. \
     a. GET /salary/type to list salary types (wages, bonus, etc.) \
-    b. POST /salary/transaction via tripletex_api_call with EXACT body: \
-       {{"date":"YYYY-MM-DD","payslips":[{{"employee":{{"id":X}}, \
-        "specifications":[{{"salaryType":{{"id":Y}},"rate":AMOUNT,"quantity":1.0}}]}}]}} \
-    Fields that DO NOT EXIST: salaryTypeEntries, entries, top-level employeeId, top-level employee. \
-    Use nested "employee" inside payslips[]. "rate"=amount, "quantity"=1.0 for lump sum.
+    b. If employee has no employment record in the pay period, create one first (see rule 26). \
+    c. POST /salary/transaction via tripletex_api_call with EXACT body: \
+       {{"year":YYYY,"month":MM,"date":"YYYY-MM-DD","payslips":[{{"employee":{{"id":X}}, \
+        "specifications":[{{"salaryType":{{"id":Y}},"rate":AMOUNT,"count":1.0}}]}}]}} \
+    REQUIRED top-level fields: year (integer), month (integer 1-12), date. \
+    Field is "count" NOT "quantity" (quantity causes 422). \
+    Fields that DO NOT EXIST: salaryTypeEntries, entries, quantity, top-level employeeId. \
+    If error "ikke registrert med et arbeidsforhold i perioden": employee needs employment record.
 
 17. LIST INVOICES: tripletex_list_invoices requires invoiceDateFrom and invoiceDateTo. \
     Always pass a date range, e.g. dateFrom=2020-01-01 dateTo=2030-12-31 if unspecified.
@@ -153,14 +156,30 @@ CRITICAL RULES (every violation reduces your score):
     b. PUT /project/{{id}} with body: {{"id": X, "version": Y, "isFixedPrice": true, "fixedprice": AMOUNT}} \
     Field is "fixedprice" ALL LOWERCASE — NOT "fixedPrice" (camelCase) which causes 422.
 
-25. COMPANY BANK ACCOUNT (required before any invoice in a fresh sandbox): \
-    If invoice creation fails with "bankkontonummer" error: \
-    a. tripletex_api_call GET /token/session/whoAmI → find "loggedInCompanyId" \
-    b. tripletex_api_call GET /company/{{companyId}}?fields=id,version \
-    c. tripletex_api_call PUT /company/{{companyId}} body: \
+25. COMPANY BANK ACCOUNT (required before invoice creation or payment in fresh sandbox): \
+    If invoice creation fails with "bankkontonummer" error OR payment returns unexpected 404: \
+    a. tripletex_api_call GET /company?fields=id,version → take values[0] for company id+version \
+       (DO NOT use /token/session/whoAmI — that endpoint returns 405 through this proxy) \
+    b. tripletex_api_call PUT /company/{{companyId}} body: \
        {{"id": X, "version": Y, "bankAccountNumber": "12345678903"}} \
     Norwegian account numbers: 11 digits. Use "12345678903" as dummy if none given. \
-    Then retry the invoice creation. This is a one-time setup per submission.
+    Then retry the failed operation. This is a one-time setup per submission.
+
+26. EMPLOYEE EMPLOYMENT RECORD (required for salary/payroll tasks): \
+    Path is POST /employee/employment (NOT /employee/{{id}}/employment — that returns 404). \
+    Minimum body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}} \
+    Do NOT include: percentageOfFullTimeEquivalent, positionPercentage, employmentStartDate \
+    — all of these cause 422 "Feltet eksisterer ikke". Only employee and startDate are needed. \
+    Create the employment record BEFORE running payroll if the error says \
+    "ikke registrert med et arbeidsforhold i perioden" (not registered with employment in period).
+
+27. LIST SUPPLIER INVOICES: GET /supplierInvoice requires invoiceDateFrom and invoiceDateTo. \
+    Always pass a date range. Also: isPaid is NOT a valid filter field for SupplierInvoiceDTO.
+
+28. INVOICE/SUPPLIER INVOICE FIELDS: When listing with tripletex_list_invoices or \
+    GET /supplierInvoice, do NOT request these fields — they do not exist in the DTO: \
+    dueDate, isPaid, amountOutstanding. These cause 400 errors. \
+    Use default fields or request: id,invoiceDate,customer,amountCurrency,amountOutstandingCurrency
 
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
