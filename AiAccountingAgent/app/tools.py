@@ -145,6 +145,26 @@ _DECLARATIONS = [
         ),
     ),
 
+    # ── Suppliers ─────────────────────────────────────────────────────────────
+
+    types.FunctionDeclaration(
+        name="tripletex_create_supplier",
+        description=(
+            "Create a new SUPPLIER (leverandør / fornecedor / fournisseur / Lieferant). "
+            "Use this when the task says 'supplier', 'leverandør', 'fornecedor', 'fournisseur', or 'Lieferant'. "
+            "Do NOT use tripletex_create_customer for suppliers — they are different entities."
+        ),
+        parameters=_obj(
+            {
+                "name": _s("Supplier / company name"),
+                "email": _s("Email address"),
+                "organizationNumber": _s("Norwegian org. number (9 digits)"),
+                "phoneNumber": _s("Phone number"),
+            },
+            required=["name"],
+        ),
+    ),
+
     # ── Customers ─────────────────────────────────────────────────────────────
 
     types.FunctionDeclaration(
@@ -617,6 +637,17 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "phoneNumberWork": args.get("phoneNumberWork"),
             }))
 
+        # ── Suppliers ─────────────────────────────────────────────────────────
+
+        case "tripletex_create_supplier":
+            return client.post("/supplier", _none_stripped({
+                "name": args.get("name"),
+                "email": args.get("email"),
+                "organizationNumber": args.get("organizationNumber"),
+                "phoneNumber": args.get("phoneNumber"),
+                "isSupplier": True,
+            }))
+
         # ── Customers ─────────────────────────────────────────────────────────
 
         case "tripletex_list_customers":
@@ -741,9 +772,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         case "tripletex_register_payment":
             if not args.get("paymentDate") or not args.get("amount"):
                 return {"success": False, "error": "Required: paymentDate (YYYY-MM-DD) and amount (number). paymentTypeId defaults to 1."}
+            # NOTE: /:payment is an action endpoint — uses query params, NOT JSON body
             return client.put(
                 f"/invoice/{args['invoice_id']}/:payment",
-                body={
+                params={
                     "paymentDate": args["paymentDate"],
                     "paidAmount": args["amount"],
                     "paymentTypeId": args.get("paymentTypeId") or 1,

@@ -115,9 +115,19 @@ CRITICAL RULES (every violation reduces your score):
 17. LIST INVOICES: tripletex_list_invoices requires invoiceDateFrom and invoiceDateTo. \
     Always pass a date range, e.g. dateFrom=2020-01-01 dateTo=2030-12-31 if unspecified.
 
+18. SUPPLIER vs CUSTOMER: A "supplier" (leverandør / fornecedor / fournisseur / Lieferant) is \
+    a DIFFERENT entity from a customer. Use tripletex_create_supplier for suppliers. \
+    Do NOT use tripletex_create_customer for a supplier task — the score checks /supplier endpoint.
+
+19. FX/CURRENCY PAYMENT: When registering payment in a foreign currency, use \
+    tripletex_register_payment with the RECEIVED amount. Tripletex auto-books the exchange \
+    rate difference — do NOT create manual vouchers for currency gain/loss. \
+    Postings on system-generated rows (row 0, AR accounts) cannot be manually created.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer
+• Create supplier → tripletex_create_supplier (NOT tripletex_create_customer)
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
 • Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1)
 • Travel expense → tripletex_create_travel_expense(employee_id) → then api_call \
