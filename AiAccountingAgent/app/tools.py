@@ -481,7 +481,7 @@ def execute_tool(client: TripletexClient, name: str, args: dict) -> dict:
     """
     logger.info(
         f"Tool call: {name}",
-        extra={"tool": name, "args": json.dumps(args, default=str)[:300]},
+        extra={"tool": name, "tool_args": json.dumps(args, default=str)[:300]},
     )
     try:
         result = _dispatch(client, name, args)

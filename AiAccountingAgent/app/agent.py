@@ -131,6 +131,8 @@ def run_agent(
         tool_config=types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(mode="AUTO")
         ),
+        # Disable AFC — we manage the tool-calling loop ourselves
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
     logger.info(
