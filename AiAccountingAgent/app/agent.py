@@ -133,10 +133,14 @@ CRITICAL RULES (every violation reduces your score):
     Credit accounts payable (2910) or other liability (2990). \
     For depreciation: Debit depreciation expense (6010/6020/etc.), Credit 12x9 account. \
     NEVER post to VAT accounts manually — use vatType_id on the expense line instead. \
-    When using tripletex_api_call for a voucher: path is /ledger/voucher (NOT /voucher).
+    When using tripletex_api_call for a voucher: path is /ledger/voucher (NOT /voucher). \
+    POSTINGS MUST HAVE row field: each posting needs "row": N (1-indexed, starting at 1). \
+    Row 0 is system-reserved — Tripletex rejects any posting without an explicit row >= 1. \
+    The tripletex_create_voucher tool sets row automatically; use it instead of api_call for vouchers.
 
 21. SUPPLIER INVOICES: Use tripletex_create_supplier_invoice to register an incoming invoice. \
     Required fields: supplier_id, invoiceDate, amountCurrency. \
+    Do NOT pass dueDate — that field does not exist on /supplierInvoice and causes 422. \
     Do NOT use tripletex_create_voucher for supplier invoices — use the dedicated tool. \
     Flow: tripletex_create_supplier → tripletex_create_supplier_invoice.
 
@@ -180,6 +184,18 @@ CRITICAL RULES (every violation reduces your score):
     GET /supplierInvoice, do NOT request these fields — they do not exist in the DTO: \
     dueDate, isPaid, amountOutstanding. These cause 400 errors. \
     Use default fields or request: id,invoiceDate,customer,amountCurrency,amountOutstandingCurrency
+
+29. LEDGER POSTINGS FIELDS: When calling tripletex_list_postings or GET /ledger/posting, \
+    do NOT request account.number in fields — it causes 400 "number does not match PostingDTO". \
+    Valid fields: id,date,description,amount,account,voucher,row. \
+    To get account numbers, request fields=id,date,amount,account and then account returns \
+    an object with its own id — use a separate GET /ledger/account/{id} if needed.
+
+30. EMPLOYEE CREATION: department.id is REQUIRED when creating employees via POST /employee. \
+    If the task doesn't specify a department, create one first (POST /department with any name), \
+    then use that department_id when creating the employee. \
+    If employee creation fails with "email already exists", search for the employee \
+    with tripletex_list_employees (by name or email) instead of retrying creation.
 
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)

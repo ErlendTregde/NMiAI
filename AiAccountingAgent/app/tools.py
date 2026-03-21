@@ -180,7 +180,6 @@ _DECLARATIONS = [
             {
                 "supplier_id": _i("Supplier ID (create supplier first if needed)"),
                 "invoiceDate": _s("Invoice date (YYYY-MM-DD)"),
-                "dueDate": _s("Payment due date (YYYY-MM-DD)"),
                 "amountCurrency": _n("Total invoice amount including VAT"),
                 "amountExcludingVatCurrency": _n("Amount excluding VAT — optional"),
                 "currency_code": _s("Currency code, e.g. 'NOK', 'EUR', 'USD' — defaults to NOK"),
@@ -452,7 +451,8 @@ _DECLARATIONS = [
         description=(
             "Create an activity (work type used for time tracking on projects). "
             "Use this when the task asks to create activities, tasks, or work types. "
-            "After creating, the activity can be linked to a project."
+            "The activityType is set automatically to 1 (GENERAL_HOURS) — do not pass it. "
+            "After creating, link the activity to the project using tripletex_link_activity_to_project."
         ),
         parameters=_obj(
             {
@@ -699,11 +699,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             currency_code = args.get("currency_code") or "NOK"
             body = _none_stripped({
                 "invoiceDate": args.get("invoiceDate"),
-                "dueDate": args.get("dueDate"),
+                # dueDate does not exist on /supplierInvoice — omitted
                 "supplier": {"id": args["supplier_id"]},
                 "amountCurrency": args.get("amountCurrency"),
                 "amountExcludingVatCurrency": args.get("amountExcludingVatCurrency"),
-                "currency": {"code": currency_code},
+                # factor must be >= 1; code alone defaults factor to 0 which causes 422
+                "currency": {"code": currency_code, "factor": 1},
                 "invoiceNumber": args.get("invoiceNumber"),
                 "kid": args.get("kid"),
                 "description": args.get("description"),
@@ -891,6 +892,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "description": args.get("description"),
                 "isGeneral": args.get("isGeneral", False),
                 "isChargeable": args.get("isChargeable"),
+                "activityType": 1,  # required integer; 1 = GENERAL_HOURS; omitting causes 422
             }))
 
         case "tripletex_link_activity_to_project":
@@ -936,8 +938,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
 
         case "tripletex_create_voucher":
             postings = []
-            for p in args.get("postings") or []:
+            for i, p in enumerate(args.get("postings") or [], start=1):
                 postings.append(_none_stripped({
+                    "row": i,  # 1-indexed; row 0 is system-reserved and causes 422
                     "account": {"id": p["account_id"]},
                     "amount": p.get("amount"),
                     "description": p.get("description"),
