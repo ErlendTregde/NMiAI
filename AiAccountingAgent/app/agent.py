@@ -84,6 +84,10 @@ CRITICAL RULES (every violation reduces your score):
 12. ORDER LINE PRICE: The price field in order lines is called unitPriceExcludingVat \
     in this tool. Pass the numeric price there.
 
+13. ON TOOL ERRORS: Read the error message. Fix exactly the fields mentioned. \
+    Retry ONCE with the corrected values. Do not spiral into multiple guesses. \
+    403 = session expired, stop immediately and return.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer

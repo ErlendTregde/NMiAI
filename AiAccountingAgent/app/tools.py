@@ -448,8 +448,9 @@ _DECLARATIONS = [
             "Use this for operations not covered by the other tools, such as: "
             "granting employee administrator access (PUT /employee/{id}/loggedInUser), "
             "enabling modules (PUT /company/{id}/settings), "
-            "action endpoints like /invoice/{id}/:remind, "
-            "or any endpoint you discover from error messages. "
+            "action endpoints like /invoice/{id}/:remind. "
+            "IMPORTANT: Do NOT use this for payment registration — "
+            "use tripletex_register_payment instead. "
             "Example: method='PUT', path='/employee/42/loggedInUser', "
             "body={'role': 'ADMINISTRATOR'}"
         ),
@@ -608,14 +609,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "vatType": {"id": line["vatTypeId"]} if line.get("vatTypeId") else None,
                 })
                 order_lines.append(ol)
-            body = {
+            body = _none_stripped({
                 "customer": {"id": args["customer_id"]},
                 "orderDate": args["orderDate"],
-            }
-            if order_lines:
-                body["orderLines"] = order_lines
-            if args.get("deliveryDate"):
-                body["deliveryDate"] = args["deliveryDate"]
+                "deliveryDate": args.get("deliveryDate") or None,
+                "orderLines": order_lines or None,
+            })
             return client.post("/order", body)
 
         case "tripletex_get_order":
