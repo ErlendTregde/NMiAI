@@ -145,8 +145,8 @@ CRITICAL RULES (every violation reduces your score):
     ONLY send: supplier_id, invoiceDate, amountCurrency, invoiceNumber (optional), kid (optional). \
     CURRENCY: For NOK invoices, do NOT set currency_code. For foreign: set currency_code to "EUR" etc. \
     If POST /supplierInvoice returns 500: do NOT fall back to vouchers (wrong entity, wrong score). \
-    Do NOT try bank account setup when supplier invoice returns 500 — it is unrelated. \
-    Just retry once with exactly the same minimal body; if it fails again, stop. \
+    Do NOT try bank account setup or search for accounts — the 500 is a server bug, unrelated. \
+    Retry ONCE with the same body; if 500 again, STOP immediately. \
     Flow: tripletex_create_supplier → tripletex_create_supplier_invoice.
 
 22. DEPRECIATION TASK (avskrivning): Debit depreciation expense account (6010, 6020 etc.), \
@@ -177,28 +177,26 @@ CRITICAL RULES (every violation reduces your score):
     skip bank account setup and accept invoicing will fail for this submission. \
     Then retry the failed operation. This is a one-time setup per submission.
 
-26. EMPLOYEE EMPLOYMENT RECORD (required for salary/payroll tasks): \
-    STEP 1 — ALWAYS get division/company ID first: \
-    tripletex_api_call GET /employee/entitlement → divisionId = values[0].customer.id \
-    (Required to link employment to the legal entity — without it salary fails with \
-    "Arbeidsforholdet er ikke knyttet mot en virksomhet".) \
-    \
-    STEP 2 — Create employment: POST /employee/employment \
-    Body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD","division":{{"id":divisionId}}}} \
+26. EMPLOYEE EMPLOYMENT RECORD: \
+    Path is POST /employee/employment. \
+    MINIMUM body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}} \
+    Do NOT include division.id — it causes 422 "Det er ikke mulig å knytte arbeidsforholdet \
+    til den juridiske enheten". Let Tripletex auto-assign the division. \
     Do NOT include: percentageOfFullTimeEquivalent, positionPercentage, positionCode, \
     annualSalary, yearlySalary — all cause 422 "Feltet eksisterer ikke". \
     \
-    STEP 3 — Employment DETAILS (position % — only if task requires it): \
+    For employment DETAILS (position %, type — only if task requires it): \
     POST /employee/employment/details (NOT PUT /employee/employment/{{id}}): \
     body: {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD", \
            "percentageOfFullTimeEquivalent":100.0}} \
     Path /employee/employment/employmentDetails does NOT exist (returns 405 — wrong path). \
     NEVER use PUT /employee/employment/{{id}} to set position details — always fails. \
     \
-    SALARY: POST /salary/transaction is for running payroll (pays the employee). \
-    Use it only if the task says "run payroll", "register payslip" or "process salary". \
-    For employment CONTRACT tasks, configure salary type but do NOT run a salary transaction. \
-    If running salary, the year/month MUST match an active employment period (not a future start date).
+    SALARY: POST /salary/transaction is for running payroll (actually paying the employee). \
+    Use it only if the task explicitly says "run payroll", "register payslip" or "process salary". \
+    For employment CONTRACT tasks (creating employee from a contract PDF), do NOT run a \
+    salary transaction — just create the employee, employment record, and employment details. \
+    If running salary, the year/month MUST match an active employment period.
 
 27. LIST SUPPLIER INVOICES: GET /supplierInvoice requires invoiceDateFrom and invoiceDateTo. \
     Always pass a date range. Also: isPaid is NOT a valid filter field for SupplierInvoiceDTO.
@@ -237,9 +235,31 @@ CRITICAL RULES (every violation reduces your score):
     (returns 500). Instead, use tripletex_create_credit_note(invoice_id, date) to reverse it. \
     This creates a kreditnota that cancels the original invoice.
 
+33. EMPLOYEE EMAIL: Tripletex requires an email address for all employees (userType=1). \
+    If the task or PDF contract does not specify an email, generate one from the name: \
+    firstName.lastName@example.com (all lowercase, spaces replaced with hyphens). \
+    Example: "Miguel Silva" → miguel.silva@example.com. \
+    NEVER retry employee creation without email — it will always fail with "email: Må angis".
+
+34. BANK RECONCILIATION (bankutskrift / bank statement CSV): \
+    This is a Tier 3 task. Steps: \
+    a. Read the CSV file carefully — identify: date, description, amount, reference/KID for each row. \
+    b. Positive amounts = incoming payments (customers paying invoices). \
+       Negative amounts = outgoing payments (paying supplier invoices) or bank fees. \
+    c. For each incoming payment: find or create the customer invoice in Tripletex, then \
+       tripletex_register_payment(invoice_id, paymentDate, amount). \
+    d. For bank fees/interest/charges: create a manual voucher: \
+       Debit expense account (7770 for bank fees, 8050 for interest expense), \
+       Credit bank account representation (use account 1920 only in voucher credits). \
+    e. IMPORTANT: In a fresh sandbox, invoices do NOT exist yet. If the CSV references \
+       invoice numbers, you must CREATE the customers and invoices first using data in the CSV \
+       (customer name from description, amount from CSV row), THEN register payments. \
+    f. If bank statement shows existing sequential invoice IDs (1, 2, 3 etc. already in system), \
+       list them with tripletex_list_invoices to find matching amounts, then register payments.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
-• Create employment → GET /employee/entitlement (divisionId) → POST /employee/employment with division
+• Create employment → POST /employee/employment with minimum body (NO division.id)
 • Create customer → POST /customer
 • Create supplier → tripletex_create_supplier (NOT tripletex_create_customer)
 • Create incoming invoice → tripletex_create_supplier → tripletex_create_supplier_invoice
@@ -253,6 +273,7 @@ COMMON PATTERNS:
 • Delete travel expense → GET /travelExpense → DELETE /travelExpense/{{id}}
 • Update entity → GET /{{resource}}/{{id}} (for version) → PUT /{{resource}}/{{id}}
 • Reverse/credit a payment → tripletex_create_credit_note(invoice_id, date) creates kreditnota
+• Bank reconciliation → read CSV rows → match to invoices → register payments → vouchers for fees
 """
 
 
