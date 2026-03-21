@@ -96,14 +96,21 @@ CRITICAL RULES (every violation reduces your score):
 14. EMPLOYEE userType: The tripletex_create_employee tool handles userType automatically. \
     Do NOT try to set userType manually via tripletex_api_call.
 
-15. PROJECT ACTIVITIES: Use tripletex_create_activity to create activities, then \
-    use them for time tracking on projects. Create project first, then activities.
+15. PROJECT ACTIVITIES & BILLING: \
+    a. tripletex_create_activity(name, isChargeable=true for billable work) \
+    b. tripletex_link_activity_to_project(project_id, activity_id) — REQUIRED before use \
+    c. Log hours: tripletex_api_call POST /timesheet/entry body: \
+       {{"employee":{{"id":X}},"project":{{"id":Y}},"activity":{{"id":Z}},"date":"YYYY-MM-DD","hours":8.0}} \
+    d. Invoice: tripletex_create_order(customer_id) → tripletex_create_invoice(order_id) \
+    NEVER use PUT /project/{{id}}/activity or PUT /project/{{id}} to link activities — both fail.
 
 16. SALARY/PAYROLL TASKS: NEVER use tripletex_create_voucher for salary. \
-    Tripletex blocks manual voucher postings on salary accounts. Instead use: \
     a. GET /salary/type to list salary types (wages, bonus, etc.) \
-    b. POST /salary/transaction to create a salary transaction via tripletex_api_call. \
-    A salary transaction requires: employeeId, date, and salary type entries with amounts.
+    b. POST /salary/transaction via tripletex_api_call with EXACT body: \
+       {{"date":"YYYY-MM-DD","payslips":[{{"employee":{{"id":X}}, \
+        "specifications":[{{"salaryType":{{"id":Y}},"rate":AMOUNT,"quantity":1.0}}]}}]}} \
+    Fields that DO NOT EXIST: salaryTypeEntries, entries, top-level employeeId, top-level employee. \
+    Use nested "employee" inside payslips[]. "rate"=amount, "quantity"=1.0 for lump sum.
 
 17. LIST INVOICES: tripletex_list_invoices requires invoiceDateFrom and invoiceDateTo. \
     Always pass a date range, e.g. dateFrom=2020-01-01 dateTo=2030-12-31 if unspecified.
@@ -117,6 +124,7 @@ COMMON PATTERNS:
   POST /travelExpense/{{id}}/perDiemCompensation for per-diem with dates
 • Delete travel expense → GET /travelExpense → DELETE /travelExpense/{{id}}
 • Update entity → GET /{{resource}}/{{id}} (for version) → PUT /{{resource}}/{{id}}
+• Reverse/credit a payment → tripletex_create_credit_note(invoice_id, date) creates kreditnota
 """
 
 

@@ -85,8 +85,8 @@ _DECLARATIONS = [
         description=(
             "Create a new employee. "
             "IMPORTANT: If the task says the employee should be 'kontoadministrator' or "
-            "'administrator', after creating call tripletex_api_call with "
-            "PUT /employee/{id}/loggedInUser to grant administrator access."
+            "'administrator', after creating call tripletex_grant_entitlement to grant the role "
+            "(first GET /employee/entitlement to find the entitlement ID)."
         ),
         parameters=_obj(
             {
@@ -407,11 +407,27 @@ _DECLARATIONS = [
             {
                 "name": _s("Activity name"),
                 "description": _s("Description — optional"),
-                "isProject": _b("Whether this is a project activity (default true)"),
                 "isGeneral": _b("Whether this is a general/global activity (default false)"),
                 "isChargeable": _b("Whether hours on this activity are chargeable to the customer"),
             },
             required=["name"],
+        ),
+    ),
+
+    types.FunctionDeclaration(
+        name="tripletex_link_activity_to_project",
+        description=(
+            "Link an activity to a project so it can be used for time tracking and billing. "
+            "Call AFTER creating both the project and the activity. "
+            "NEVER use PUT /project/{id} or PUT /project/{id}/activity — those do not work. "
+            "The correct endpoint is POST /project/projectActivity."
+        ),
+        parameters=_obj(
+            {
+                "project_id": _i("Project ID"),
+                "activity_id": _i("Activity ID to link to the project"),
+            },
+            required=["project_id", "activity_id"],
         ),
     ),
 
@@ -494,13 +510,13 @@ _DECLARATIONS = [
         description=(
             "Make a custom call to ANY Tripletex v2 endpoint. "
             "Use this for operations not covered by the other tools, such as: "
-            "granting employee administrator access (PUT /employee/{id}/loggedInUser), "
+            "granting entitlements (POST /employee/entitlement with employee, entitlement, customer:{id:0}), "
             "enabling modules (PUT /company/{id}/settings), "
+            "timesheet entries (POST /timesheet/entry), "
+            "salary transactions (POST /salary/transaction), "
             "action endpoints like /invoice/{id}/:remind. "
             "IMPORTANT: Do NOT use this for payment registration — "
-            "use tripletex_register_payment instead. "
-            "Example: method='PUT', path='/employee/42/loggedInUser', "
-            "body={'role': 'ADMINISTRATOR'}"
+            "use tripletex_register_payment instead."
         ),
         parameters=_obj(
             {
@@ -583,9 +599,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             }))
 
         case "tripletex_grant_entitlement":
-            return client.put("/employee/entitlement/grant", body={
+            return client.post("/employee/entitlement", {
                 "employee": {"id": args["employee_id"]},
                 "entitlement": {"id": args["entitlement_id"]},
+                "customer": {"id": 0},  # 0 = current company (required by API)
             })
 
         case "tripletex_update_employee":
@@ -776,10 +793,15 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             return client.post("/activity", _none_stripped({
                 "name": args.get("name"),
                 "description": args.get("description"),
-                "isProject": args.get("isProject", True),
                 "isGeneral": args.get("isGeneral", False),
                 "isChargeable": args.get("isChargeable"),
             }))
+
+        case "tripletex_link_activity_to_project":
+            return client.post("/project/projectActivity", {
+                "project": {"id": args["project_id"]},
+                "activity": {"id": args["activity_id"]},
+            })
 
         # ── Departments ───────────────────────────────────────────────────────
 
