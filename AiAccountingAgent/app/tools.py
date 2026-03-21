@@ -627,6 +627,129 @@ _DECLARATIONS = [
 TOOLS = types.Tool(function_declarations=_DECLARATIONS)
 
 
+# ── Auto-fix helpers ──────────────────────────────────────────────────────────
+# These transparently resolve known error patterns without consuming LLM
+# iterations.  The model never sees the error — only the fixed result.
+
+def _auto_fix_payment_404(client: TripletexClient, args: dict) -> Any | None:
+    """Fix payment 404 by discovering the correct paymentTypeId for this sandbox."""
+    if "payment_type" in client._auto_fix_attempted:
+        return None
+    client._auto_fix_attempted.add("payment_type")
+    logger.info("Payment 404 — auto-fetching valid payment types")
+    try:
+        pt = client.get("/invoice/paymentType", params={"fields": "id,description", "count": 5})
+        values = (pt or {}).get("values", [])
+        if not values:
+            return None
+        new_id = values[0]["id"]
+        return client.put(
+            f"/invoice/{args['invoice_id']}/:payment",
+            params={
+                "paymentDate": args["paymentDate"],
+                "paidAmount": args["amount"],
+                "paymentTypeId": new_id,
+            },
+        )
+    except TripletexError:
+        return None
+
+
+def _auto_fix_employee_email(client: TripletexClient, args: dict, exc: TripletexError) -> Any | None:
+    """Find existing employee when email-conflict 422 occurs."""
+    has_email_error = any(
+        "email" in (vm.get("field") or "").lower()
+        for vm in exc.validation_messages
+    )
+    if not has_email_error or not args.get("email"):
+        return None
+    logger.info(f"Employee email conflict — searching for existing: {args.get('email')}")
+    try:
+        search = client.get("/employee", params={
+            "email": args["email"],
+            "fields": "id,firstName,lastName,email,version",
+            "count": 1,
+        })
+        values = (search or {}).get("values", [])
+        if values:
+            return {"value": values[0], "_note": "Employee already existed (found by email)"}
+    except TripletexError:
+        pass
+    return None
+
+
+def _auto_fix_activity_name(client: TripletexClient, args: dict) -> Any | None:
+    """Find existing activity when name-conflict 422 occurs."""
+    name = args.get("name")
+    if not name:
+        return None
+    logger.info(f"Activity name conflict — searching for existing: {name}")
+    try:
+        search = client.get("/activity", params={
+            "name": name,
+            "fields": "id,name,isChargeable,isGeneral",
+            "count": 5,
+        })
+        values = (search or {}).get("values", [])
+        if values:
+            return {"value": values[0], "_note": "Activity already existed (found by name)"}
+    except TripletexError:
+        pass
+    return None
+
+
+def _auto_fix_product_exists(client: TripletexClient, args: dict) -> Any | None:
+    """Find existing product when creation fails with 'already registered'."""
+    name = args.get("name")
+    if not name:
+        return None
+    logger.info(f"Product already exists — searching for: {name}")
+    try:
+        search = client.get("/product", params={
+            "name": name,
+            "fields": "id,name,number,priceExcludingVatCurrency",
+            "count": 1,
+        })
+        values = (search or {}).get("values", [])
+        if values:
+            return {"value": values[0], "_note": "Product already existed (found by name)"}
+    except TripletexError:
+        pass
+    return None
+
+
+def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
+    """Fix invoice 422 'bankkontonummer' by setting up company bank account."""
+    if "bank_account" in client._auto_fix_attempted:
+        return None
+    client._auto_fix_attempted.add("bank_account")
+    logger.info("Invoice blocked by missing bank account — attempting auto-setup")
+    try:
+        ent = client.get("/employee/entitlement", params={"fields": "id,customer", "count": 1})
+        company_id = ent["values"][0]["customer"]["id"]
+        company = client.get(f"/company/{company_id}", params={"fields": "id,version"})
+        version = company["value"]["version"]
+        client.put(f"/company/{company_id}", body={
+            "id": company_id,
+            "version": version,
+            "bankAccountNumber": "12345678903",
+        })
+        logger.info("Bank account set — retrying invoice creation")
+        from datetime import date as _date, timedelta as _td
+        invoice_date = args["invoiceDate"]
+        due_date = args.get("invoiceDueDate") or (
+            _date.fromisoformat(invoice_date) + _td(days=30)
+        ).isoformat()
+        return client.post("/invoice", {
+            "invoiceDate": invoice_date,
+            "invoiceDueDate": due_date,
+            "orders": [{"id": args["order_id"]}],
+        })
+    except TripletexError as bank_exc:
+        logger.warning(f"Bank account auto-setup failed: {bank_exc}")
+        return None
+
+
 # ── Tool executor ──────────────────────────────────────────────────────────────
 
 def execute_tool(client: TripletexClient, name: str, args: dict) -> dict:
@@ -674,11 +797,11 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_employee":
-            return client.post("/employee", _none_stripped({
+            emp_body = _none_stripped({
                 "firstName": args.get("firstName"),
                 "lastName": args.get("lastName"),
                 "email": args.get("email"),
-                "userType": args.get("userTypeId", 1),  # Required: 0 is invalid, 1 = standard employee
+                "userType": args.get("userTypeId", 1),
                 "department": {"id": args["departmentId"]} if args.get("departmentId") else None,
                 "employeeNumber": args.get("employeeNumber"),
                 "phoneNumberMobile": args.get("phoneNumberMobile"),
@@ -687,7 +810,15 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "dateOfBirth": args.get("dateOfBirth"),
                 "nationalIdentityNumber": args.get("nationalIdentityNumber"),
                 "bankAccountNumber": args.get("bankAccountNumber"),
-            }))
+            })
+            try:
+                return client.post("/employee", emp_body)
+            except TripletexError as exc:
+                if exc.status_code == 422:
+                    fix = _auto_fix_employee_email(client, args, exc)
+                    if fix is not None:
+                        return fix
+                raise
 
         case "tripletex_grant_entitlement":
             # Note: field is "entitlementId" (integer), NOT "entitlement": {object}
@@ -782,13 +913,22 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_product":
-            return client.post("/product", _none_stripped({
-                "name": args.get("name"),
-                "number": args.get("number"),
-                "priceExcludingVatCurrency": args.get("priceExcludingVatCurrency"),
-                "costExcludingVatCurrency": args.get("costExcludingVatCurrency"),
-                "vatType": {"id": args["vatTypeId"]} if args.get("vatTypeId") else None,
-            }))
+            try:
+                return client.post("/product", _none_stripped({
+                    "name": args.get("name"),
+                    "number": args.get("number"),
+                    "priceExcludingVatCurrency": args.get("priceExcludingVatCurrency"),
+                    "costExcludingVatCurrency": args.get("costExcludingVatCurrency"),
+                    "vatType": {"id": args["vatTypeId"]} if args.get("vatTypeId") else None,
+                }))
+            except TripletexError as exc:
+                if exc.status_code == 422:
+                    msg = (exc.message or "").lower()
+                    if "allerede" in msg or "already" in msg:
+                        fix = _auto_fix_product_exists(client, args)
+                        if fix is not None:
+                            return fix
+                raise
 
         # ── Orders ────────────────────────────────────────────────────────────
 
@@ -827,13 +967,19 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             due_date = args.get("invoiceDueDate") or (
                 _date.fromisoformat(invoice_date) + _td(days=30)
             ).isoformat()
-            body = {
+            inv_body = {
                 "invoiceDate": invoice_date,
                 "invoiceDueDate": due_date,
                 "orders": [{"id": args["order_id"]}],
             }
-            # sendToCustomer removed — use tripletex_send_invoice separately
-            return client.post("/invoice", body)
+            try:
+                return client.post("/invoice", inv_body)
+            except TripletexError as exc:
+                if exc.status_code == 422 and "bankkontonummer" in (exc.message or "").lower():
+                    fix = _auto_fix_invoice_bank(client, args)
+                    if fix is not None:
+                        return fix
+                raise
 
         case "tripletex_list_invoices":
             return client.get("/invoice", params=_none_stripped({
@@ -865,14 +1011,21 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             if not args.get("paymentDate") or not args.get("amount"):
                 return {"success": False, "error": "Required: paymentDate (YYYY-MM-DD) and amount (number). paymentTypeId defaults to 1."}
             # NOTE: /:payment is an action endpoint — uses query params, NOT JSON body
-            return client.put(
-                f"/invoice/{args['invoice_id']}/:payment",
-                params={
-                    "paymentDate": args["paymentDate"],
-                    "paidAmount": args["amount"],
-                    "paymentTypeId": args.get("paymentTypeId") or 1,
-                },
-            )
+            try:
+                return client.put(
+                    f"/invoice/{args['invoice_id']}/:payment",
+                    params={
+                        "paymentDate": args["paymentDate"],
+                        "paidAmount": args["amount"],
+                        "paymentTypeId": args.get("paymentTypeId") or 1,
+                    },
+                )
+            except TripletexError as exc:
+                if exc.status_code == 404:
+                    fix = _auto_fix_payment_404(client, args)
+                    if fix is not None:
+                        return fix
+                raise
 
         # ── Travel Expenses ───────────────────────────────────────────────────
 
@@ -921,13 +1074,25 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             }))
 
         case "tripletex_create_activity":
-            return client.post("/activity", _none_stripped({
-                "name": args.get("name"),
-                "description": args.get("description"),
-                "isGeneral": args.get("isGeneral", False),
-                "isChargeable": args.get("isChargeable"),
-                "activityType": 1,  # required integer; 1 = GENERAL_HOURS; omitting causes 422
-            }))
+            try:
+                return client.post("/activity", _none_stripped({
+                    "name": args.get("name"),
+                    "description": args.get("description"),
+                    "isGeneral": args.get("isGeneral", False),
+                    "isChargeable": args.get("isChargeable"),
+                    "activityType": 1,
+                }))
+            except TripletexError as exc:
+                if exc.status_code == 422:
+                    has_name_error = any(
+                        "navn" in (vm.get("message") or "").lower()
+                        for vm in exc.validation_messages
+                    )
+                    if has_name_error:
+                        fix = _auto_fix_activity_name(client, args)
+                        if fix is not None:
+                            return fix
+                raise
 
         case "tripletex_link_activity_to_project":
             return client.post("/project/projectActivity", {

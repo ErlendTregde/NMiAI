@@ -35,6 +35,8 @@ class TripletexClient:
         })
         # Accumulated call log — written to structured logs after solve
         self.call_log: list[dict] = []
+        # Track auto-fix attempts to avoid repeating them
+        self._auto_fix_attempted: set[str] = set()
 
     # ── Public interface ──────────────────────────────────────────────────────
 
