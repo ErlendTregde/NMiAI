@@ -97,10 +97,12 @@ Chain: customer → product → order → invoice → [send] → [payment]
 
 ═══ SUPPLIERS ═══
 • Supplier ≠ Customer. "leverandør/fornecedor/fournisseur/Lieferant" → tripletex_create_supplier.
-• Supplier invoice: tripletex_create_supplier_invoice — required: supplier_id, invoiceDate, \
-  amountCurrency (total WITH VAT). NEVER include: dueDate, description, amountExcludingVatCurrency.
+• Supplier invoice ("leverandørfaktura/inngående faktura/factura del proveedor"): \
+  ALWAYS use tripletex_create_supplier_invoice — NOT tripletex_create_voucher. \
+  Required: supplier_id, invoiceDate, amountCurrency (total WITH VAT). \
+  NEVER include: dueDate, description, amountExcludingVatCurrency.
 • For NOK: omit currency_code. For foreign: set currency_code="EUR" etc.
-• If 500: retry ONCE with same body. If 500 again, STOP.
+• If 500 persists: the tool auto-retries with minimal body. Do NOT retry manually.
 
 ═══ PROJECTS ═══
 • tripletex_create_project requires name + startDate. Set projectManagerId if task mentions a manager.
@@ -143,11 +145,20 @@ Chain: customer → product → order → invoice → [send] → [payment]
   NEVER search for exact 4-digit numbers that might not exist — always use 2-digit prefix first. \
   ONE search with a 2-digit prefix gives you all accounts in that range — do NOT repeat searches.
 • Row numbers: start at 1 (0 is system-reserved). The tool sets rows automatically.
-• VAT: set vatType_id on expense line. Never post to VAT accounts directly.
+• VAT: set vatType_id on expense line. Never post to VAT accounts directly. \
+  Common VAT type IDs: 3=25% MVA (utgående), 5=25% MVA (inngående/fradrag). \
+  GET /ledger/vatType to find all IDs. For expenses/receipts, use INNGÅENDE (input) VAT.
 • GET /ledger/vatType to find VAT type IDs.
+• RECEIPT/EXPENSE VOUCHER PATTERN (kvittering/reçu/Quittung/recibo): \
+  1. Find department (tripletex_list_departments) \
+  2. Find expense account (tripletex_list_accounts number=71 for travel, 65 for office, etc.) \
+  3. Find VAT types (GET /ledger/vatType) — use INNGÅENDE MVA for expenses \
+  4. Create voucher: Debit expense account (with vatType_id + department_id) / Credit 2990 \
+  5. Include employee_id if task specifies an employee
 • Common account numbers: 6300=leie (rent), 6340=lys/varme (utilities), \
   6500=kontorutstyr (office supplies), 6800=kontorrekvisita (office equipment), \
-  6900=telefon (phone), 7770=bankgebyr (bank fees), 8050=rentekostnad (interest expense), \
+  6900=telefon (phone), 7100=bilgodtgjørelse (mileage), 7140=reisekostnad (travel), \
+  7770=bankgebyr (bank fees), 8050=rentekostnad (interest expense), \
   2910=leverandørgjeld (AP), 2990=annen kortsiktig gjeld (other current liabilities).
 
 ═══ SALARY ═══

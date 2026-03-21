@@ -645,9 +645,22 @@ TOOLS = types.Tool(function_declarations=_DECLARATIONS)
 
 def _auto_fix_payment_404(client: TripletexClient, args: dict) -> Any | None:
     """Fix payment 404 by discovering the correct paymentTypeId for this sandbox."""
-    if "payment_type" in client._auto_fix_attempted:
-        return None
-    client._auto_fix_attempted.add("payment_type")
+    # If we already discovered the correct payment type, reuse it
+    cached_id = getattr(client, "_cached_payment_type_id", None)
+    if cached_id:
+        logger.info(f"Payment 404 — reusing cached paymentTypeId={cached_id}")
+        try:
+            return client.put(
+                f"/invoice/{args['invoice_id']}/:payment",
+                params={
+                    "paymentDate": args["paymentDate"],
+                    "paidAmount": args["amount"],
+                    "paymentTypeId": cached_id,
+                },
+            )
+        except TripletexError:
+            return None
+
     logger.info("Payment 404 — auto-fetching valid payment types")
     try:
         pt = client.get("/invoice/paymentType", params={"fields": "id,description", "count": 5})
@@ -655,6 +668,7 @@ def _auto_fix_payment_404(client: TripletexClient, args: dict) -> Any | None:
         if not values:
             return None
         new_id = values[0]["id"]
+        client._cached_payment_type_id = new_id  # Cache for future payments
         return client.put(
             f"/invoice/{args['invoice_id']}/:payment",
             params={
@@ -733,7 +747,13 @@ def _auto_fix_product_exists(client: TripletexClient, args: dict) -> Any | None:
 def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
     """Fix invoice 422 'bankkontonummer' by setting up company bank account."""
     if "bank_account" in client._auto_fix_attempted:
-        return None
+        # Already tried once — raise STOP to prevent infinite retries
+        raise TripletexError(
+            422,
+            "BLOCKED: Invoice creation requires a company bank account, but setup already "
+            "failed. Do NOT retry invoice creation — it will always fail. "
+            "Complete any other parts of the task instead.",
+        )
     client._auto_fix_attempted.add("bank_account")
     logger.info("Invoice blocked by missing bank account — attempting auto-setup")
     try:
@@ -874,9 +894,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
 
         case "tripletex_create_supplier_invoice":
             currency_code = args.get("currency_code") or "NOK"
+            invoice_date = args.get("invoiceDate")
             body = _none_stripped({
-                "invoiceDate": args.get("invoiceDate"),
-                # dueDate, description, amountExcludingVatCurrency: do NOT exist or cause 500 — omitted
+                "invoiceDate": invoice_date,
+                "voucherDate": invoice_date,  # Required for auto-generated voucher
                 "supplier": {"id": args["supplier_id"]},
                 "amountCurrency": args.get("amountCurrency"),
                 # Omit currency for NOK (Tripletex default) — sending it causes 500.
@@ -885,7 +906,20 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "invoiceNumber": args.get("invoiceNumber"),
                 "kid": args.get("kid"),
             })
-            return client.post("/supplierInvoice", body)
+            try:
+                return client.post("/supplierInvoice", body)
+            except TripletexError as exc:
+                if exc.status_code >= 500:
+                    # Retry with minimal body — some fields may cause 500
+                    logger.warning("Supplier invoice 500 — retrying with minimal body")
+                    minimal_body = {
+                        "invoiceDate": invoice_date,
+                        "voucherDate": invoice_date,
+                        "supplier": {"id": args["supplier_id"]},
+                        "amountCurrency": args.get("amountCurrency"),
+                    }
+                    return client.post("/supplierInvoice", minimal_body)
+                raise
 
         # ── Customers ─────────────────────────────────────────────────────────
 
@@ -942,7 +976,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             except TripletexError as exc:
                 if exc.status_code == 422:
                     msg = (exc.message or "").lower()
-                    if "allerede" in msg or "already" in msg:
+                    # Check validation messages too (number conflicts appear there)
+                    vm_text = " ".join(
+                        (vm.get("message") or "") for vm in exc.validation_messages
+                    ).lower()
+                    all_text = msg + " " + vm_text
+                    if any(kw in all_text for kw in ("allerede", "already", "i bruk", "in use")):
                         fix = _auto_fix_product_exists(client, args)
                         if fix is not None:
                             return fix
