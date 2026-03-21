@@ -105,6 +105,26 @@ _DECLARATIONS = [
     ),
 
     types.FunctionDeclaration(
+        name="tripletex_grant_entitlement",
+        description=(
+            "Grant a role or access entitlement to an employee. "
+            "Use this to grant 'kontoadministrator' (admin) or 'project manager' access. "
+            "Step 1: call tripletex_api_call GET /employee/entitlement to list available "
+            "entitlement IDs for this account. "
+            "Step 2: call this tool with the employee_id and the correct entitlement_id. "
+            "IMPORTANT: For project manager — grant the entitlement BEFORE creating "
+            "the project with that employee as projectManager."
+        ),
+        parameters=_obj(
+            {
+                "employee_id": _i("Employee ID to grant the entitlement to"),
+                "entitlement_id": _i("Entitlement ID (discover via GET /employee/entitlement)"),
+            },
+            required=["employee_id", "entitlement_id"],
+        ),
+    ),
+
+    types.FunctionDeclaration(
         name="tripletex_update_employee",
         description=(
             "Update an existing employee. "
@@ -556,6 +576,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "phoneNumberHome": args.get("phoneNumberHome"),
                 "phoneNumberWork": args.get("phoneNumberWork"),
             }))
+
+        case "tripletex_grant_entitlement":
+            return client.put("/employee/entitlement/grant", body={
+                "employee": {"id": args["employee_id"]},
+                "entitlement": {"id": args["entitlement_id"]},
+            })
 
         case "tripletex_update_employee":
             return client.put(f"/employee/{args['id']}", _none_stripped({

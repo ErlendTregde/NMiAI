@@ -65,9 +65,12 @@ CRITICAL RULES (every violation reduces your score):
 6. STOP WHEN DONE: After completing the task, do not make verification calls \
    unless you have specific reason for uncertainty.
 
-7. EMPLOYEE ROLES: If an employee should be 'kontoadministrator' or 'administrator', \
-   this is worth many scoring points. After creating the employee, use \
-   tripletex_api_call to grant the role (e.g. PUT /employee/{{id}}/loggedInUser).
+7. EMPLOYEE ROLES: If an employee needs 'kontoadministrator', 'administrator', or \
+   'project manager' access (worth many scoring points): \
+   a. Call tripletex_api_call GET /employee/entitlement to list available role IDs \
+   b. Call tripletex_grant_entitlement with employee_id and the correct entitlement_id. \
+   DO NOT use PUT /employee/{{id}}/loggedInUser — that endpoint returns 404. \
+   For project manager: grant entitlement BEFORE setting employee as projectManager in a project.
 
 8. TODAY'S DATE: {today}
 
