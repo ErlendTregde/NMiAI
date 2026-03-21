@@ -88,6 +88,12 @@ CRITICAL RULES (every violation reduces your score):
     Retry ONCE with the corrected values. Do not spiral into multiple guesses. \
     403 = session expired, stop immediately and return.
 
+14. EMPLOYEE userType: The tripletex_create_employee tool handles userType automatically. \
+    Do NOT try to set userType manually via tripletex_api_call.
+
+15. PROJECT ACTIVITIES: Use tripletex_create_activity to create activities, then \
+    use them for time tracking on projects. Create project first, then activities.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer
@@ -185,9 +191,9 @@ def run_agent(
         # Use SDK shortcut which handles thinking tokens and mixed parts correctly
         function_calls = response.function_calls or []
 
-        # Log what the model said (text parts) for debugging
+        # Log what the model said (text parts) — skip thought/reasoning parts
         for part in (model_content.parts or []):
-            if hasattr(part, "text") and part.text:
+            if hasattr(part, "text") and part.text and not getattr(part, "thought", False):
                 logger.info(f"Model text: {part.text[:300]}")
 
         if not function_calls:

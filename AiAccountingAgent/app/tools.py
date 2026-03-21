@@ -93,6 +93,7 @@ _DECLARATIONS = [
                 "firstName": _s("First name"),
                 "lastName": _s("Last name"),
                 "email": _s("Email address"),
+                "userTypeId": _i("User type integer ID. Default 1 (standard employee). Use 1 unless the task explicitly requires a different type."),
                 "employeeNumber": _s("Employee number (optional)"),
                 "phoneNumberMobile": _s("Mobile phone number"),
                 "phoneNumberHome": _s("Home phone number"),
@@ -367,6 +368,27 @@ _DECLARATIONS = [
         ),
     ),
 
+    # ── Activities ────────────────────────────────────────────────────────────
+
+    types.FunctionDeclaration(
+        name="tripletex_create_activity",
+        description=(
+            "Create an activity (work type used for time tracking on projects). "
+            "Use this when the task asks to create activities, tasks, or work types. "
+            "After creating, the activity can be linked to a project."
+        ),
+        parameters=_obj(
+            {
+                "name": _s("Activity name"),
+                "description": _s("Description — optional"),
+                "isProject": _b("Whether this is a project activity (default true)"),
+                "isGeneral": _b("Whether this is a general/global activity (default false)"),
+                "isChargeable": _b("Whether hours on this activity are chargeable to the customer"),
+            },
+            required=["name"],
+        ),
+    ),
+
     # ── Departments ───────────────────────────────────────────────────────────
 
     types.FunctionDeclaration(
@@ -526,6 +548,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "firstName": args.get("firstName"),
                 "lastName": args.get("lastName"),
                 "email": args.get("email"),
+                "userType": args.get("userTypeId", 1),  # Required: 0 is invalid, 1 = standard employee
                 "employeeNumber": args.get("employeeNumber"),
                 "phoneNumberMobile": args.get("phoneNumberMobile"),
                 "phoneNumberHome": args.get("phoneNumberHome"),
@@ -713,6 +736,17 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "endDate": args.get("endDate"),
                 "description": args.get("description"),
                 "projectManager": {"id": args["projectManagerId"]} if args.get("projectManagerId") else None,
+            }))
+
+        # ── Activities ────────────────────────────────────────────────────────
+
+        case "tripletex_create_activity":
+            return client.post("/activity", _none_stripped({
+                "name": args.get("name"),
+                "description": args.get("description"),
+                "isProject": args.get("isProject", True),
+                "isGeneral": args.get("isGeneral", False),
+                "isChargeable": args.get("isChargeable"),
             }))
 
         # ── Departments ───────────────────────────────────────────────────────
