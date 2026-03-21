@@ -343,18 +343,20 @@ _DECLARATIONS = [
 
     types.FunctionDeclaration(
         name="tripletex_create_travel_expense",
-        description="Create a travel expense report.",
+        description=(
+            "Create a travel expense report container. "
+            "IMPORTANT: Only 'employee_id' is accepted on creation. "
+            "Do NOT send description, travelFromDate, travelToDate, or purpose — "
+            "those fields don't exist on POST (they are read-only / set via sub-resources). "
+            "After creating the report, use tripletex_api_call to add details: "
+            "POST /travelExpense/{id}/perDiemCompensation for per-diem with dates, "
+            "POST /travelExpense/{id}/cost for individual costs."
+        ),
         parameters=_obj(
             {
-                "description": _s("Description / purpose of travel"),
                 "employee_id": _i("Employee ID who travelled"),
-                "travelFromDate": _s("Travel start date (YYYY-MM-DD)"),
-                "travelToDate": _s("Travel end date (YYYY-MM-DD)"),
-                "destination": _s("Destination"),
-                "purpose": _s("Purpose of travel"),
-                "isCompleted": _b("Whether the report is submitted/completed"),
             },
-            required=["description", "employee_id", "travelFromDate", "travelToDate"],
+            required=["employee_id"],
         ),
     ),
 
@@ -720,12 +722,14 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Payments ──────────────────────────────────────────────────────────
 
         case "tripletex_register_payment":
+            if not args.get("paymentDate") or not args.get("amount"):
+                return {"success": False, "error": "Required: paymentDate (YYYY-MM-DD) and amount (number). paymentTypeId defaults to 1."}
             return client.put(
                 f"/invoice/{args['invoice_id']}/:payment",
                 body={
                     "paymentDate": args["paymentDate"],
                     "paidAmount": args["amount"],
-                    "paymentTypeId": args.get("paymentTypeId", 1),
+                    "paymentTypeId": args.get("paymentTypeId") or 1,
                 },
             )
 
@@ -738,15 +742,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_travel_expense":
-            return client.post("/travelExpense", _none_stripped({
-                "description": args.get("description"),
+            return client.post("/travelExpense", {
                 "employee": {"id": args["employee_id"]},
-                "travelFromDate": args.get("travelFromDate"),
-                "travelToDate": args.get("travelToDate"),
-                "destination": args.get("destination"),
-                "purpose": args.get("purpose"),
-                "isCompleted": args.get("isCompleted", False),
-            }))
+            })
 
         case "tripletex_delete_travel_expense":
             client.delete(f"/travelExpense/{args['id']}")

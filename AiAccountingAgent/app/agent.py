@@ -113,6 +113,8 @@ COMMON PATTERNS:
 • Create customer → POST /customer
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
 • Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1)
+• Travel expense → tripletex_create_travel_expense(employee_id) → then api_call \
+  POST /travelExpense/{{id}}/perDiemCompensation for per-diem with dates
 • Delete travel expense → GET /travelExpense → DELETE /travelExpense/{{id}}
 • Update entity → GET /{{resource}}/{{id}} (for version) → PUT /{{resource}}/{{id}}
 """
