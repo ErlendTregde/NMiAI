@@ -71,11 +71,24 @@ CRITICAL RULES (every violation reduces your score):
 
 8. TODAY'S DATE: {today}
 
+9. PRODUCT NUMBERS: NEVER invent a product number. The 'number' field is not in \
+   the tool schema — Tripletex assigns it automatically. If the task mentions a \
+   specific product number, use tripletex_api_call to set it.
+
+10. PAYMENT FIELDS: tripletex_register_payment uses these exact fields: \
+    invoice_id, paymentDate (YYYY-MM-DD), amount (number), paymentTypeId (1=bank transfer).
+
+11. INVOICE DUE DATE: invoiceDueDate is REQUIRED. If the task does not specify it, \
+    use invoiceDate + 30 days. Never omit it.
+
+12. ORDER LINE PRICE: The price field in order lines is called unitPriceExcludingVat \
+    in this tool. Pass the numeric price there.
+
 COMMON PATTERNS:
 • Create employee → POST /employee (+ grant role if required)
 • Create customer → POST /customer
 • Create invoice → POST /customer → POST /product → POST /order → POST /invoice
-• Register payment → POST /invoice/{{id}}/:payment
+• Register payment → tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1)
 • Delete travel expense → GET /travelExpense → DELETE /travelExpense/{{id}}
 • Update entity → GET /{{resource}}/{{id}} (for version) → PUT /{{resource}}/{{id}}
 """

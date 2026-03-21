@@ -180,11 +180,14 @@ _DECLARATIONS = [
 
     types.FunctionDeclaration(
         name="tripletex_create_product",
-        description="Create a new product.",
+        description=(
+            "Create a new product. "
+            "Do NOT supply a product number — Tripletex auto-assigns one. "
+            "Only set vatTypeId=3 for standard 25% Norwegian VAT."
+        ),
         parameters=_obj(
             {
                 "name": _s("Product name"),
-                "number": _s("Product number / SKU"),
                 "priceExcludingVatCurrency": _n("Sales price excluding VAT"),
                 "costExcludingVatCurrency": _n("Cost price excluding VAT"),
                 "vatTypeId": _i("VAT type ID. Use 3 for standard 25% Norwegian VAT."),
@@ -601,7 +604,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "product": {"id": line["product_id"]} if line.get("product_id") else None,
                     "description": line.get("description"),
                     "count": line.get("count", 1),
-                    "unitPriceExcludingVat": line.get("unitPriceExcludingVat"),
+                    "unitPriceExcludingVatCurrency": line.get("unitPriceExcludingVat"),
                     "vatType": {"id": line["vatTypeId"]} if line.get("vatTypeId") else None,
                 })
                 order_lines.append(ol)
@@ -623,12 +626,16 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Invoices ──────────────────────────────────────────────────────────
 
         case "tripletex_create_invoice":
+            from datetime import date as _date, timedelta as _td
+            invoice_date = args["invoiceDate"]
+            due_date = args.get("invoiceDueDate") or (
+                _date.fromisoformat(invoice_date) + _td(days=30)
+            ).isoformat()
             body = {
-                "invoiceDate": args["invoiceDate"],
+                "invoiceDate": invoice_date,
+                "invoiceDueDate": due_date,
                 "orders": [{"id": args["order_id"]}],
             }
-            if args.get("invoiceDueDate"):
-                body["invoiceDueDate"] = args["invoiceDueDate"]
             if args.get("sendToCustomer") is not None:
                 body["sendToCustomer"] = args["sendToCustomer"]
             return client.post("/invoice", body)
@@ -657,12 +664,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Payments ──────────────────────────────────────────────────────────
 
         case "tripletex_register_payment":
-            return client.post(
+            return client.put(
                 f"/invoice/{args['invoice_id']}/:payment",
-                {
+                body={
                     "paymentDate": args["paymentDate"],
-                    "amount": args["amount"],
-                    "paymentType": {"id": args.get("paymentTypeId", 1)},
+                    "paidAmount": args["amount"],
+                    "paymentTypeId": args.get("paymentTypeId", 1),
                 },
             )
 
