@@ -94,6 +94,7 @@ _DECLARATIONS = [
                 "lastName": _s("Last name"),
                 "email": _s("Email address"),
                 "userTypeId": _i("User type integer ID. Default 1 (standard employee). Use 1 unless the task explicitly requires a different type."),
+                "departmentId": _i("Department ID to assign employee to — optional"),
                 "employeeNumber": _s("Employee number (optional)"),
                 "phoneNumberMobile": _s("Mobile phone number"),
                 "phoneNumberHome": _s("Home phone number"),
@@ -549,6 +550,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "lastName": args.get("lastName"),
                 "email": args.get("email"),
                 "userType": args.get("userTypeId", 1),  # Required: 0 is invalid, 1 = standard employee
+                "department": {"id": args["departmentId"]} if args.get("departmentId") else None,
                 "employeeNumber": args.get("employeeNumber"),
                 "phoneNumberMobile": args.get("phoneNumberMobile"),
                 "phoneNumberHome": args.get("phoneNumberHome"),
