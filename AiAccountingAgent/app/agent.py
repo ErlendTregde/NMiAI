@@ -117,9 +117,13 @@ Chain: customer → product → order → invoice → [send] → [payment]
   is likely just the last digits (e.g. 3 or 1). Search ALL invoices with wide range and examine each. \
   If only 1 invoice exists in the sandbox, that is probably the one the task refers to. \
   Match by customer name or amount if the number doesn't match exactly.
-• DUNNING (purring/inkasso/Mahnung): \
+• DUNNING (purring/inkasso/Mahnung/rappel): \
   1. Find the existing overdue invoice (DO NOT create a new fake one). \
-  2. Send reminder: tripletex_api_call PUT /invoice/{{id}}/:remind. \
+  2. Send reminder: tripletex_api_call PUT /invoice/{{id}}/:createReminder \
+     with params: {{"type":"REMINDER","date":"YYYY-MM-DD"}}. \
+     Type options: SOFT_REMINDER, REMINDER, NOTICE_OF_DEBT_COLLECTION, DEBT_COLLECTION. \
+     Optional params: includeCharge=true (to add fee), includeInterest=true (to add interest). \
+     IMPORTANT: The endpoint is /:createReminder NOT /:remind (which does NOT exist). \
   3. If task asks to create a dunning fee invoice: create a NEW invoice for just the fee amount.
 • REVERSE/UNDO PAYMENT: There is NO GET /invoice/{{id}}/payment endpoint (returns 404). \
   There is NO GET /invoice/payment endpoint (returns 422). \
@@ -312,7 +316,7 @@ Chain: customer → product → order → invoice → [send] → [payment]
   (dateOfBirth and division are auto-fixed — just create the employment and submit salary)
 • Depreciation: list_accounts(number=60) + list_accounts(number=10) + list_accounts(number=12) → pick expense + accum depr → create_voucher
 • Credit note: list_invoices (wide date range) → create_credit_note
-• Dunning: list_invoices → PUT /invoice/{{id}}/:remind → [optional: create fee invoice]
+• Dunning: list_invoices → PUT /invoice/{{id}}/:createReminder?type=REMINDER&date=TODAY → [optional: fee invoice]
 • Accounting dimensions: POST /ledger/accountingDimensionName → POST /ledger/accountingDimensionValue
 • Year-end closing: list_accounts → create depreciation vouchers → reverse prepaid expenses → accrue liabilities
 • Travel expense: list_employees → create_travel_expense → add per_diem/costs

@@ -386,7 +386,7 @@ CLAUDE_TOOLS = [
     {"name": "tripletex_api_call",
      "description": (
          "Make a custom call to ANY Tripletex v2 endpoint. "
-         "Use for: entitlements, salary transactions, timesheet entries, action endpoints like /:remind. "
+         "Use for: entitlements, salary transactions, timesheet entries, action endpoints like /:createReminder. "
          "Do NOT use for payment registration — use tripletex_register_payment."
      ),
      "input_schema": {"type": "object", "properties": {
@@ -1297,6 +1297,18 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "to find existing accounts. Search without a number filter to see all "
                     "accounts, or use a 2-digit prefix like number=65 to find all 65xx accounts.",
                 )
+
+            # Intercept /:remind → /:createReminder (correct endpoint name)
+            if "/:remind" in path and "/:createReminder" not in path:
+                path = path.replace("/:remind", "/:createReminder")
+                # Ensure required params exist
+                if params is None:
+                    params = {}
+                if "type" not in params:
+                    params["type"] = "REMINDER"
+                if "date" not in params:
+                    from datetime import date as _date
+                    params["date"] = _date.today().isoformat()
 
             # Intercept POST /ledger/accountingDimensionName — fix field names
             # The DTO uses "dimensionName" NOT "name"
