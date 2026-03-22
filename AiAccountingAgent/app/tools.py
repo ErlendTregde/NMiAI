@@ -332,8 +332,8 @@ _DECLARATIONS = [
         name="tripletex_list_invoices",
         description=(
             "List invoices. invoiceDateFrom and invoiceDateTo are REQUIRED by the API. "
-            "INVALID fields (cause 400): dueDate, isPaid, amountOutstanding — do NOT request these. "
-            "Valid fields: id, invoiceDate, customer, amountCurrency, amountOutstandingCurrency, invoiceNumber."
+            "INVALID fields (cause 400): dueDate, isPaid, amountOutstanding, amountOutstandingCurrency — auto-stripped. "
+            "Valid fields: id, invoiceDate, invoiceDueDate, amountCurrency, customer, amount, invoiceNumber."
         ),
         parameters=_obj({
             "invoiceDateFrom": _s("Start date filter (YYYY-MM-DD) — REQUIRED"),
@@ -560,7 +560,8 @@ _DECLARATIONS = [
             "ALWAYS use this tool for vouchers — NEVER use tripletex_api_call for /ledger/voucher "
             "(api_call does not set row numbers, causing row-0 422 errors). "
             "FORBIDDEN accounts (system-protected — will cause 422 guiRow-0 error): "
-            "bank/cash (1920, 1900), AR (1500), VAT (2700-2709). "
+            "bank/cash (1920, 1900), VAT (2700-2709). "
+            "Account 1500 (AR): allowed but REQUIRES customer_id on the posting. "
             "Account 2400 (AP): allowed but REQUIRES supplier_id on the posting. "
             "For expenses/receipts: Debit expense account (6xxx) + specify vatType_id on that line; "
             "Credit accounts payable (2910 leverandørgjeld) or other liability (2990). "
@@ -583,6 +584,7 @@ _DECLARATIONS = [
                             "to VAT accounts. Find IDs via tripletex_api_call GET /ledger/vatType."
                         ),
                         "department_id": _i("Department ID to assign this posting to"),
+                        "customer_id": _i("Customer ID — REQUIRED when posting to AR account 1500 (kundefordringer)"),
                         "supplier_id": _i("Supplier ID — REQUIRED when posting to AP account 2400 (leverandørgjeld)"),
                         "employee_id": _i("Employee ID — required for employee-related expense postings (reise, personal expenses)"),
                     }),
@@ -744,6 +746,55 @@ def _auto_fix_product_exists(client: TripletexClient, args: dict) -> Any | None:
     return None
 
 
+def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
+    """Fix salary division error by linking the employee's employment to a division."""
+    try:
+        # Find the employee ID from the salary transaction body
+        payslips = body.get("payslips") or []
+        if not payslips:
+            return False
+        emp_id = (payslips[0].get("employee") or {}).get("id")
+        if not emp_id:
+            return False
+
+        # Find a valid division
+        try:
+            divs = client.get("/company/divisions", params={"fields": "id,name", "count": 1})
+            div_values = (divs or {}).get("values", [])
+        except TripletexError:
+            div_values = []
+
+        if not div_values:
+            logger.warning("No divisions found — cannot fix salary division error")
+            return False
+
+        div_id = div_values[0]["id"]
+
+        # Find the employee's employment record
+        emps = client.get("/employee/employment", params={
+            "employeeId": emp_id,
+            "fields": "id,version,division",
+            "count": 1,
+        })
+        emp_records = (emps or {}).get("values", [])
+        if not emp_records:
+            logger.warning(f"No employment record found for employee {emp_id}")
+            return False
+
+        employment = emp_records[0]
+        # Update employment with division
+        logger.info(f"Auto-linking employment {employment['id']} to division {div_id}")
+        client.put(f"/employee/employment/{employment['id']}", body={
+            "id": employment["id"],
+            "version": employment.get("version", 0),
+            "division": {"id": div_id},
+        })
+        return True
+    except TripletexError as e:
+        logger.warning(f"Auto-fix salary division failed: {e}")
+        return False
+
+
 def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
     """Fix invoice 422 'bankkontonummer' by setting up company bank account."""
     if "bank_account" in client._auto_fix_attempted:
@@ -891,7 +942,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_update_employee":
-            return client.put(f"/employee/{args['id']}", _none_stripped({
+            body = _none_stripped({
                 "id": args["id"],
                 "version": args["version"],
                 "firstName": args.get("firstName"),
@@ -903,7 +954,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "dateOfBirth": args.get("dateOfBirth"),
                 "nationalIdentityNumber": args.get("nationalIdentityNumber"),
                 "bankAccountNumber": args.get("bankAccountNumber"),
-            }))
+            })
+            if args.get("departmentId"):
+                body["department"] = {"id": args["departmentId"]}
+            return client.put(f"/employee/{args['id']}", body)
 
         # ── Suppliers ─────────────────────────────────────────────────────────
 
@@ -1062,11 +1116,15 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 raise
 
         case "tripletex_list_invoices":
+            fields = args.get("fields", "id,invoiceDate,invoiceDueDate,amountCurrency,customer,amount,invoiceNumber")
+            # Strip invalid fields that cause 400
+            bad_fields = {"dueDate", "isPaid", "amountOutstanding", "amountOutstandingCurrency"}
+            fields = ",".join(f for f in fields.split(",") if f.strip() not in bad_fields)
             return client.get("/invoice", params=_none_stripped({
                 "invoiceDateFrom": args.get("invoiceDateFrom", "2020-01-01"),
                 "invoiceDateTo": args.get("invoiceDateTo", "2030-12-31"),
                 "customerId": args.get("customerId"),
-                "fields": args.get("fields", "id,invoiceDate,invoiceDueDate,amountCurrency,customer,amount"),
+                "fields": fields,
                 "count": args.get("count", 10),
             }))
 
@@ -1183,8 +1241,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Departments ───────────────────────────────────────────────────────
 
         case "tripletex_list_departments":
+            fields = args.get("fields", "id,name,departmentNumber")
+            # Strip invalid fields that cause 400
+            bad_fields = {"division"}
+            fields = ",".join(f for f in fields.split(",") if f.strip() not in bad_fields)
             return client.get("/department", params={
-                "fields": args.get("fields", "id,name,departmentNumber"),
+                "fields": fields,
                 "count": 10,
             })
 
@@ -1235,6 +1297,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "description": p.get("description"),
                     "vatType": {"id": p["vatType_id"]} if p.get("vatType_id") else None,
                     "department": {"id": p["department_id"]} if p.get("department_id") else None,
+                    "customer": {"id": p["customer_id"]} if p.get("customer_id") else None,
                     "supplier": {"id": p["supplier_id"]} if p.get("supplier_id") else None,
                     "employee": {"id": p["employee_id"]} if p.get("employee_id") else None,
                 }))
@@ -1279,11 +1342,39 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                         p["row"] = i
                 body["postings"] = postings
 
-            # Intercept POST /employee/employment — strip fields that cause 422
+            # Intercept POST /employee/employment — strip bad fields + auto-fix prerequisites
             if method == "POST" and path.rstrip("/") == "/employee/employment":
-                for bad_field in ("division", "percentageOfFullTimeEquivalent",
+                # Strip model's potentially bad values for these fields
+                for bad_field in ("percentageOfFullTimeEquivalent",
                                   "positionPercentage", "positionCode", "annualSalary"):
                     body.pop(bad_field, None)
+                # Auto-set dateOfBirth if missing (required for employment creation)
+                emp_ref = body.get("employee") or {}
+                emp_id = emp_ref.get("id")
+                if emp_id:
+                    try:
+                        emp_data = client.get(f"/employee/{emp_id}", params={"fields": "id,dateOfBirth,version"})
+                        emp_val = (emp_data or {}).get("value", {})
+                        if not emp_val.get("dateOfBirth"):
+                            logger.info(f"Auto-setting dateOfBirth for employee {emp_id}")
+                            client.put(f"/employee/{emp_id}", body={
+                                "id": emp_id,
+                                "version": emp_val.get("version", 0),
+                                "dateOfBirth": "1990-01-01",
+                            })
+                    except TripletexError as e:
+                        logger.warning(f"Failed to auto-set dateOfBirth: {e}")
+                # Auto-discover and set division (required for salary transactions later)
+                if not body.get("division"):
+                    body.pop("division", None)  # Remove empty/None division
+                    try:
+                        divs = client.get("/company/divisions", params={"fields": "id,name", "count": 1})
+                        div_values = (divs or {}).get("values", [])
+                        if div_values:
+                            body["division"] = {"id": div_values[0]["id"]}
+                            logger.info(f"Auto-linked employment to division {div_values[0]['id']}")
+                    except TripletexError:
+                        logger.warning("Could not find division for employment — salary may fail later")
 
             # Intercept POST /employee/employment/details — auto-rename
             # positionPercentage → percentageOfFullTimeEquivalent
@@ -1294,11 +1385,30 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 for bad_field in ("annualSalary", "positionCode"):
                     body.pop(bad_field, None)
 
+            # Intercept POST /salary/transaction — auto-fix division on employment
+            if method == "POST" and path.rstrip("/") == "/salary/transaction":
+                # Auto-add count:1.0 to salary specifications if missing
+                for payslip in (body.get("payslips") or []):
+                    for spec in (payslip.get("specifications") or []):
+                        if spec.get("count") is None:
+                            spec["count"] = 1.0
+
             match method:
                 case "GET":
                     return client.get(path, params=params)
                 case "POST":
-                    return client.post(path, body)
+                    try:
+                        return client.post(path, body)
+                    except TripletexError as exc:
+                        # Auto-fix salary division error by patching employment
+                        if (path.rstrip("/") == "/salary/transaction"
+                                and exc.status_code == 422
+                                and any("virksomhet" in (vm.get("message") or "").lower()
+                                        for vm in exc.validation_messages)):
+                            fix = _auto_fix_salary_division(client, body)
+                            if fix:
+                                return client.post(path, body)
+                        raise
                 case "PUT":
                     # Intercept PUT /employee/employment/details too
                     if "/employment/details" in path:

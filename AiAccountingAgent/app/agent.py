@@ -58,6 +58,9 @@ if the auto-fix also fails, in which case follow the error message guidance:
 • Activity "name in use" 422 → existing activity is auto-found and returned
 • Product "already registered" 422 → existing product is auto-found and returned
 • Invoice "bankkontonummer" 422 → bank account setup is auto-attempted and invoice retried
+• Employment "dateOfBirth" 422 → placeholder date auto-set on employee before retry
+• Salary "virksomhet" 422 → employment auto-linked to company division and retried
+• Salary "count null" 422 → count:1.0 auto-added to specifications
 
 ═══ EMPLOYEES ═══
 • department.id is REQUIRED. If task doesn't specify, create one first: \
@@ -88,6 +91,15 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Payment: tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1). \
   Payment 404 is auto-fixed. Do NOT try to set up bank accounts for payment errors.
 • Credit note: tripletex_create_credit_note(invoice_id, date). Never DELETE invoices.
+• FINDING EXISTING INVOICES: Sandboxes MAY have pre-existing invoices. \
+  Search with tripletex_list_invoices using WIDE date range (2020-01-01 to 2030-12-31). \
+  If the task references an invoice number (e.g. "202400003"), search ALL years. \
+  The invoiceNumber field is included in list results — match by invoiceNumber, NOT by ID. \
+  If no matching invoice found after checking all years, the invoice truly doesn't exist.
+• DUNNING (purring/inkasso/Mahnung): \
+  1. Find the existing overdue invoice (DO NOT create a new fake one). \
+  2. Send reminder: tripletex_api_call PUT /invoice/{{id}}/:remind. \
+  3. If task asks to create a dunning fee invoice: create a NEW invoice for just the fee amount.
 • REVERSE/UNDO PAYMENT: There is NO GET /invoice/{{id}}/payment endpoint (returns 404). \
   There is NO GET /invoice/payment endpoint (returns 422). \
   To reverse a payment or undo an invoice: use tripletex_create_credit_note(invoice_id, date). \
@@ -124,19 +136,21 @@ Chain: customer → product → order → invoice → [send] → [payment]
   (api_call does NOT set row numbers, causing "guiRow 0" 422 errors).
 • CHART OF ACCOUNTS IS PRE-POPULATED — NEVER create accounts (POST /ledger/account). \
   All standard Norwegian accounts (1xxx-9xxx) already exist. Use tripletex_list_accounts to find them.
-• FORBIDDEN accounts (system-protected, cause 422): 1920, 1900, 1500, 2700-2709.
-• Account 2400 (AP/leverandørgjeld): ALLOWED but requires supplier_id on the posting.
+• FORBIDDEN accounts (system-protected, cause 422): 1920, 1900, 2700-2709.
+• Account 1500 (AR/kundefordringer): ALLOWED but REQUIRES customer_id on the posting.
+• Account 2400 (AP/leverandørgjeld): ALLOWED but REQUIRES supplier_id on the posting.
 • Employee expenses: include employee_id on expense postings when task involves an employee.
 • Expense: Debit 6xxx (with vatType_id) / Credit 2910.
-• Depreciation: Debit 6010/6020 / Credit accumulated depreciation account. \
-  To find the accumulated depreciation account: \
-  a. tripletex_list_accounts(number="12") → returns ALL 12xx accounts \
-  b. Look for accounts ending in 9 (e.g. 1219, 1229, 1239, 1249, 1259) — these are \
-     accumulated depreciation. Match the asset type: \
-     1219=buildings, 1229=improvements, 1239=vehicles, 1249=inventory/furniture, 1259=machines. \
-  c. If no 12x9 account exists, credit the asset account directly (e.g. 1200, 1230, 1240). \
-  NEVER try individual exact account numbers (1249, 1259, etc.) one by one — always \
-  search with the 2-digit prefix "12" ONCE and pick from the results.
+• Depreciation: Debit depreciation expense (60xx) / Credit accumulated depreciation (10xx-12xx). \
+  Step 1: tripletex_list_accounts(number="10") + tripletex_list_accounts(number="12") in parallel. \
+  Step 2: Look for "avskrivning" (depreciation) in account names. Common patterns: \
+     1019=accum depr goodwill, 1029=accum depr development, 1039=accum depr patents, \
+     1049=accum depr copyrights, 1209=accum depr buildings, 1219=accum depr improvements, \
+     1229=accum depr vehicles, 1239=accum depr inventory, 1249=accum depr machines. \
+  Step 3: Match asset type to depreciation account. If no accumulated depreciation account \
+     exists for the asset type, credit the asset account directly (e.g. 1200, 1230). \
+  Step 4: Debit expense: search tripletex_list_accounts(number="60") for depreciation expense accounts. \
+  ALWAYS search with 2-digit prefix ("10", "12", "60") — ONE search per prefix gives all accounts.
 • ACCOUNT SEARCH: Use tripletex_list_accounts with 2-digit PREFIX in number field: \
   number=65 → all 65xx accounts, number=12 → all 12xx accounts. \
   Examples: number=65 (office), number=69 (telecom), number=71 (travel), \
@@ -165,8 +179,12 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • NEVER use vouchers for salary. Use tripletex_api_call POST /salary/transaction:
   {{"year":YYYY,"month":MM,"date":"YYYY-MM-DD","payslips":[{{"employee":{{"id":X}}, \
    "specifications":[{{"salaryType":{{"id":Y}},"rate":AMOUNT,"count":1.0}}]}}]}}
-• Field is "count" NOT "quantity". GET /salary/type to find salary type IDs.
-• Employee needs employment record first (POST /employee/employment).
+• Field is "count" NOT "quantity" — ALWAYS include count:1.0 (auto-added if missing).
+• GET /salary/type to find salary type IDs.
+• Employee needs employment record first (POST /employee/employment). \
+  dateOfBirth and division are auto-set if missing — just create the employment. \
+  If salary fails with "virksomhet" error, the division is auto-fixed and retried. \
+  Do NOT try to manually fix division errors — let the auto-fix handle it.
 
 ═══ MONTH-END CLOSING ═══
 • Salary accrual: if the task mentions an amount, use it. If no amount is given but the task \
@@ -211,8 +229,11 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • FX invoice: GET /currency → create_order(currency_id) → create_invoice → register_payment
 • Supplier invoice: create_supplier → create_supplier_invoice
 • Project billing: list_activities → [create_activity] → link_to_project → log_hours → create_order → create_invoice
-• Depreciation: list_accounts(number=60) + list_accounts(number=12) → pick 6010/6020 + 12x9 → create_voucher
-• Credit note: list_invoices → create_credit_note
+• Salary: list_employees → GET /salary/type → POST /employee/employment → POST /salary/transaction \
+  (dateOfBirth and division are auto-fixed — just create the employment and submit salary)
+• Depreciation: list_accounts(number=60) + list_accounts(number=10) + list_accounts(number=12) → pick expense + accum depr → create_voucher
+• Credit note: list_invoices (wide date range) → create_credit_note
+• Dunning: list_invoices → PUT /invoice/{{id}}/:remind → [optional: create fee invoice]
 • Travel expense: list_employees → create_travel_expense → add per_diem/costs
 • Delete travel: list_travel_expenses → delete_travel_expense
 """
