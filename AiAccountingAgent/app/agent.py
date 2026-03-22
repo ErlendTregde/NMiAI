@@ -51,9 +51,10 @@ Understand fully regardless of language; reason in English.
 5. SANDBOX — usually empty, but some tasks (dunning, credit notes, corrections) have PRE-EXISTING data. \
    Check for existing entities FIRST before creating new ones. Create prerequisites only when needed.
 6. STOP WHEN DONE — do not make extra calls after the task is complete.
-7. MINIMAL TEXT — keep reasoning to 1-2 sentences max. NEVER output markdown tables, summaries, \
-   recaps, bullet lists, or explanations. Your text is NEVER shown to anyone. Every token wastes time. \
-   Just make the next tool call.
+7. ZERO TEXT — output ONLY tool calls. No summaries, no bullet points, no markdown, no recaps. \
+   Your text is NEVER shown to anyone. Every token you write wastes time and reduces your score. \
+   The only text allowed is 1 short sentence of reasoning before a tool call. \
+   NEVER write a final summary after completing the task — just stop.
 
 ═══ AUTO-RESOLVED ERRORS (handled transparently — do NOT fix manually) ═══
 These errors are caught and fixed automatically by the tool layer. You will only see them \
@@ -129,8 +130,14 @@ Chain: customer → product → order → invoice → [send] → [payment]
   There is NO GET /invoice/payment endpoint (returns 422). \
   To reverse a payment or undo an invoice: use tripletex_create_credit_note(invoice_id, date). \
   This creates a kreditnota that reverses both the invoice and any associated payment.
-• Foreign currency: GET /currency?code=EUR → pass currency_id to tripletex_create_order. \
-  Never set exchangeRate manually. Register payment in invoice currency amount.
+• Foreign currency (FX / valuta / devise / Fremdwährung): \
+  1. GET /currency?code=EUR (or USD, etc.) → get currency_id. \
+  2. tripletex_create_order(customer_id, orderDate, currency_id=X, orderLines=[...]) \
+     — prices are in foreign currency, NOT NOK. \
+  3. tripletex_create_invoice(order_id, invoiceDate) — invoice inherits currency from order. \
+  4. tripletex_register_payment — amount in INVOICE currency (e.g. EUR amount, not NOK). \
+  Never set exchangeRate manually — Tripletex uses daily rates. \
+  For FX gain/loss (agio/disagio): book voucher Debit/Credit 8060 (agio) or 8160 (disagio) if task asks.
 
 ═══ SUPPLIERS ═══
 • Supplier ≠ Customer. "leverandør/fornecedor/fournisseur/Lieferant" → tripletex_create_supplier.
@@ -297,7 +304,8 @@ Chain: customer → product → order → invoice → [send] → [payment]
   /invoice/{{id}}/payment, /invoice/payment, /employee/{{id}}/loggedInUser, \
   /employee/employment/employmentDetails, /v2/ledger/account, /v2/currency, \
   /company/division, /company/divisions, /occupationCode, /whoAmI, /company.
-• Listing: invoices require invoiceDateFrom + invoiceDateTo.
+• Listing: invoices require invoiceDateFrom + invoiceDateTo. \
+  Orders require orderDateFrom + orderDateTo (auto-filled if missing, but add them to avoid 422).
 • Invalid list fields: dueDate, isPaid, amountOutstanding (cause 400).
 • Ledger postings: do NOT request account.number (causes 400).
 • Voucher fields syntax: use fields like "id,date,description,postings" (flat). \
@@ -402,7 +410,7 @@ def run_agent(
         try:
             response = claude_client.messages.create(
                 model=config.CLAUDE_MODEL,
-                max_tokens=8192,
+                max_tokens=4096,
                 system=system_prompt,
                 tools=CLAUDE_TOOLS,
                 messages=messages,

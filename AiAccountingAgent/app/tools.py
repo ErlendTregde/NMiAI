@@ -1337,6 +1337,15 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             if clean_path in blocked_paths:
                 raise TripletexError(400, f"BLOCKED: {blocked_paths[clean_path]}")
 
+            # Auto-fill required date params for endpoints that need them
+            if method == "GET":
+                # GET /order requires orderDateFrom + orderDateTo
+                if path.rstrip("/") == "/order":
+                    if "orderDateFrom" not in params:
+                        params["orderDateFrom"] = "2020-01-01"
+                    if "orderDateTo" not in params:
+                        params["orderDateTo"] = "2030-12-31"
+
             # Strip invalid fields from GET params
             if method == "GET" and params.get("fields"):
                 fields_str = params["fields"]
