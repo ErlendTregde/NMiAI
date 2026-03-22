@@ -1303,10 +1303,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                         logger.info(f"Auto-renamed '{wrong_field}' → 'dimensionName' for accountingDimensionName")
                         break
 
-            # Intercept POST /ledger/accountingDimensionValue — fix value name field
-            # The DTO uses "displayName" for the value name.
-            # The parent reference field is NOT "accountingDimensionNameId" (causes 422).
-            # Let the model discover the correct parent field via GET first.
+            # Intercept POST /ledger/accountingDimensionValue — fix field names
+            # Schema: displayName (string), dimensionIndex (int 1/2/3), number, active, position
+            # The parent is referenced by "dimensionIndex" (1, 2, or 3) — NOT by ID or object ref
             if method == "POST" and path.rstrip("/") == "/ledger/accountingDimensionValue":
                 # Rename wrong value name fields to "displayName"
                 for wrong_field in ("name", "value", "label", "dimensionValue",
@@ -1315,10 +1314,39 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                         body["displayName"] = body.pop(wrong_field)
                         logger.info(f"Auto-renamed '{wrong_field}' → 'displayName' for accountingDimensionValue")
                         break
-                # Strip known-bad parent reference fields that cause 422
-                for bad_parent in ("accountingDimensionNameId", "dimensionName",
-                                   "dimensionId", "dimensionNameId"):
-                    body.pop(bad_parent, None)
+                # Fix parent reference: must be "dimensionIndex" (integer 1, 2, or 3)
+                # Model often sends wrong field names — convert to dimensionIndex
+                for wrong_parent in ("accountingDimensionNameId", "accountingDimensionName",
+                                     "dimensionName", "dimensionId", "dimensionNameId"):
+                    val = body.pop(wrong_parent, None)
+                    if val is not None and "dimensionIndex" not in body:
+                        if isinstance(val, dict) and "id" in val:
+                            # Can't convert ID to index — need to look it up
+                            dim_id = val["id"]
+                            try:
+                                dim = client.get(f"/ledger/accountingDimensionName/{dim_id}",
+                                                 params={"fields": "id,dimensionIndex"})
+                                idx = (dim or {}).get("value", {}).get("dimensionIndex")
+                                if idx:
+                                    body["dimensionIndex"] = idx
+                                    logger.info(f"Auto-resolved dimension ID {dim_id} → dimensionIndex {idx}")
+                            except TripletexError:
+                                body["dimensionIndex"] = 1  # Fallback to first free dimension
+                        elif isinstance(val, (int, float)):
+                            # If it looks like a dimension index (1-3), use directly
+                            if 1 <= int(val) <= 3:
+                                body["dimensionIndex"] = int(val)
+                            else:
+                                # It's probably a dimension ID — look up the index
+                                try:
+                                    dim = client.get(f"/ledger/accountingDimensionName/{int(val)}",
+                                                     params={"fields": "id,dimensionIndex"})
+                                    idx = (dim or {}).get("value", {}).get("dimensionIndex")
+                                    if idx:
+                                        body["dimensionIndex"] = idx
+                                        logger.info(f"Auto-resolved dimension ID {int(val)} → dimensionIndex {idx}")
+                                except TripletexError:
+                                    body["dimensionIndex"] = 1
 
             # Intercept POST /ledger/voucher — auto-add row numbers to prevent
             # the "guiRow 0" 422 error that occurs when rows are missing.
@@ -1383,24 +1411,39 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     body["percentageOfFullTimeEquivalent"] = body.pop("positionPercentage")
                 # Strip fields that don't belong or cause type errors on details endpoint
                 for bad_field in ("positionCode", "hoursPerDay",
-                                  "department", "division", "remunerationType"):
+                                  "department", "division"):
                     body.pop(bad_field, None)
                 # Fix occupationCode — must be object reference, not raw value
                 occ = body.get("occupationCode")
                 if occ is not None and not isinstance(occ, dict):
                     body.pop("occupationCode", None)  # Strip invalid type
 
-            # Intercept POST /travelExpense/cost — strip invalid fields
-            if method == "POST" and "/travelExpense/cost" in path:
-                # 'description' does NOT exist on the cost DTO
-                for bad_field in ("description", "name", "comment"):
+            # Intercept POST /travelExpense/cost — fix field names
+            # Schema: travelExpense, vatType, currency, costCategory, paymentType,
+            #         category, comments, rate, amountCurrencyIncVat, amountNOKInclVAT, date
+            if method == "POST" and "/travelExpense/cost" in path and "/costParticipant" not in path:
+                # 'description' → 'comments' (correct field name)
+                if "description" in body and "comments" not in body:
+                    body["comments"] = body.pop("description")
+                # Strip fields that don't exist
+                for bad_field in ("name", "title", "amount"):
                     body.pop(bad_field, None)
 
-            # Intercept POST /travelExpense/perDiemCompensation — strip invalid fields
+            # Intercept POST /travelExpense/perDiemCompensation — fix field names
+            # Schema: travelExpense, rateType, rateCategory, countryCode, travelExpenseZoneId,
+            #         overnightAccommodation, location, address, count, rate, amount,
+            #         isDeductionForBreakfast/Lunch/Dinner
             if method == "POST" and "/travelExpense/perDiemCompensation" in path:
-                # These fields do NOT exist on the perDiemCompensation DTO
-                for bad_field in ("countDays", "startDate", "endDate", "numberOfNightsOnBoat",
-                                  "description", "numberOfDays", "days"):
+                # Rename common wrong fields
+                if "countDays" in body and "count" not in body:
+                    body["count"] = body.pop("countDays")
+                if "numberOfDays" in body and "count" not in body:
+                    body["count"] = body.pop("numberOfDays")
+                if "days" in body and "count" not in body:
+                    body["count"] = body.pop("days")
+                # Strip fields that don't exist on the DTO
+                for bad_field in ("startDate", "endDate", "numberOfNightsOnBoat",
+                                  "description", "name", "title"):
                     body.pop(bad_field, None)
 
             # Intercept POST /salary/transaction — auto-fix division on employment

@@ -85,8 +85,9 @@ if the auto-fix also fails, in which case follow the error message guidance:
 • Step 2 (if task requires position %): POST /employee/employment/details with body: \
   {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD","percentageOfFullTimeEquivalent":100.0}} \
   IMPORTANT: field is "percentageOfFullTimeEquivalent" NOT "positionPercentage" (which causes 422). \
-  Do NOT include: positionCode, hoursPerDay, department, division, occupationCode, remunerationType \
-  — these cause 422 on this endpoint.
+  Do NOT include: positionCode, hoursPerDay, department, division, occupationCode \
+  — these cause 422 on this endpoint. \
+  "remunerationType" IS valid (string enum: "MONTHLY_PAY", "HOURLY_PAY", "COMMISSION_PAY").
 • To set annual salary: PUT /employee/employment/details/{{id}} with \
   {{"id":X,"version":Y,"percentageOfFullTimeEquivalent":Z,"annualSalary":AMOUNT}} — \
   annualSalary is ONLY valid on PUT update, NOT on initial POST.
@@ -227,15 +228,16 @@ Chain: customer → product → order → invoice → [send] → [payment]
   The tool auto-sets typeOfTravel=DOMESTIC (required for per diem compensation).
 • Adding costs: tripletex_api_call POST /travelExpense/cost with body: \
   {{"travelExpense":{{"id":TE_ID}},"currency":{{"code":"NOK"}},"costCategory":{{"id":CAT_ID}}, \
-  "paymentType":{{"id":PT_ID}},"amountNOKInclVAT":AMOUNT}} \
+  "paymentType":{{"id":PT_ID}},"amountNOKInclVAT":AMOUNT,"comments":"Description here"}} \
   REQUIRED: paymentType (GET /travelExpense/paymentType to find IDs). \
   REQUIRED: costCategory (GET /travelExpense/costCategory to find IDs — "Fly", "Taxi", etc.). \
-  Do NOT include: description, name, comment (none exist on cost DTO).
+  Use "comments" for text/description (NOT "description"/"name"/"comment" — none of those exist).
 • Per diem: POST /travelExpense/perDiemCompensation with body: \
   {{"travelExpense":{{"id":TE_ID}},"location":"Oslo","overnightAccommodation":"HOTEL", \
-  "count":NUM_DAYS,"rate":RATE_PER_DAY}} \
-  REQUIRED: location, overnightAccommodation. \
-  Do NOT include: countDays, startDate, endDate, numberOfNightsOnBoat, numberOfDays (none exist). \
+  "count":NUM_DAYS,"rateType":"TYPE","rateCategory":"CATEGORY"}} \
+  REQUIRED: location, overnightAccommodation (enum: "HOTEL", "NONE", "OTHER"). \
+  Valid fields: count (number of days), rateType, rateCategory. \
+  Do NOT include: countDays, startDate, endDate, numberOfNightsOnBoat, numberOfDays, rate. \
   If per diem fails: record the amount as a voucher (Debit 7160, Credit 2910).
 • Delete: GET /travelExpense → DELETE /travelExpense/{{id}}.
 • List fields: only use "id,employee,status" — travelToDate/travelFromDate do NOT exist.
@@ -244,13 +246,13 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Create custom accounting dimensions via tripletex_api_call: \
   Step 1: POST /ledger/accountingDimensionName with {{"dimensionName":"Region"}} \
   IMPORTANT: The field is "dimensionName" — NOT "name" (causes 422). \
-  Step 2: BEFORE creating values, do GET /ledger/accountingDimensionValue?count=1 to see \
-  the exact DTO field structure. The API returns example objects showing the correct field names. \
-  Step 3: POST /ledger/accountingDimensionValue — use "displayName" for the value name. \
-  IMPORTANT: "displayName" is correct — NOT "name"/"value"/"label"/"code" (all cause 422). \
-  For the parent dimension reference, check the GET response to find the correct field name. \
-  Do NOT guess field names — "accountingDimensionNameId" and "dimensionName" are BOTH wrong. \
-  Step 4: To assign a dimension value to a voucher posting, include it in the posting body. \
+  Step 2: POST /ledger/accountingDimensionValue with: \
+  {{"displayName":"Oslo","dimensionIndex":1}} \
+  IMPORTANT field names: \
+  - "displayName" = the value label (NOT "name"/"value"/"label"/"code"). \
+  - "dimensionIndex" = integer (1, 2, or 3) linking to the parent dimension (NOT any ID field). \
+  - After creating dimension name, GET /ledger/accountingDimensionName to find the dimensionIndex. \
+  Step 3: To assign a dimension value to a voucher posting, include it in the posting body. \
   Use GET /ledger/accountingDimensionName to list existing dimensions. \
   Use GET /ledger/accountingDimensionValue to list values for a dimension.
 • Dimension examples: "Produktlinje", "Prosjekt", "Avdeling", "Region", "Koststed".
