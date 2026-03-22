@@ -109,15 +109,18 @@ CLAUDE_TOOLS = [
     {"name": "tripletex_create_supplier_invoice",
      "description": (
          "Register an incoming supplier invoice (leverandørfaktura / inngående faktura). "
-         "Creates the invoice and auto-generates AP accounting entries."
+         "Uses POST /incomingInvoice. Optionally provide account_id for the expense account."
      ),
      "input_schema": {"type": "object", "properties": {
-         "supplier_id": {"type": "integer", "description": "Supplier ID"},
+         "supplier_id": {"type": "integer", "description": "Supplier ID (vendorId)"},
          "invoiceDate": {"type": "string", "description": "Invoice date (YYYY-MM-DD)"},
+         "dueDate": {"type": "string", "description": "Payment due date (YYYY-MM-DD) — optional"},
          "amountCurrency": {"type": "number", "description": "Total amount INCLUDING VAT"},
          "currency_code": {"type": "string", "description": "Currency code (e.g. 'EUR'). Omit for NOK."},
          "invoiceNumber": {"type": "string", "description": "Supplier's invoice number — optional"},
-         "kid": {"type": "string", "description": "Payment reference / KID — optional"},
+         "description": {"type": "string", "description": "Invoice description — optional"},
+         "account_id": {"type": "integer", "description": "Expense account ID for the order line — optional"},
+         "vatTypeId": {"type": "integer", "description": "VAT type ID for the order line — optional"},
      }, "required": ["supplier_id", "invoiceDate", "amountCurrency"]}},
 
     # ── Customers ─────────────────────────────────────────────────────────────
@@ -259,9 +262,18 @@ CLAUDE_TOOLS = [
      }}},
 
     {"name": "tripletex_create_travel_expense",
-     "description": "Create a travel expense report container. Only employee_id is accepted on creation.",
+     "description": (
+         "Create a travel expense report (reiseregning). "
+         "Set title, dates, and purpose from the task prompt — these are scored."
+     ),
      "input_schema": {"type": "object", "properties": {
          "employee_id": {"type": "integer", "description": "Employee ID who travelled"},
+         "title": {"type": "string", "description": "Report title/description (e.g. 'Kundebesøk Bergen')"},
+         "departureDate": {"type": "string", "description": "Departure date (YYYY-MM-DD)"},
+         "returnDate": {"type": "string", "description": "Return date (YYYY-MM-DD)"},
+         "departureFrom": {"type": "string", "description": "Departure city/location"},
+         "destination": {"type": "string", "description": "Destination city/location"},
+         "purpose": {"type": "string", "description": "Purpose of travel"},
      }, "required": ["employee_id"]}},
 
     {"name": "tripletex_delete_travel_expense",
@@ -841,30 +853,48 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             }))
 
         case "tripletex_create_supplier_invoice":
-            currency_code = args.get("currency_code") or "NOK"
+            # Use POST /incomingInvoice (correct endpoint per OpenAPI spec)
+            # POST /supplierInvoice is NOT in the spec and returns 500
             invoice_date = args.get("invoiceDate")
-            body = _none_stripped({
+            currency_code = args.get("currency_code") or "NOK"
+            header: dict = _none_stripped({
+                "vendorId": args["supplier_id"],
                 "invoiceDate": invoice_date,
-                # NOTE: voucherDate does NOT exist on supplierInvoice — never send it
-                "supplier": {"id": args["supplier_id"]},
-                "amountCurrency": args.get("amountCurrency"),
-                # Omit currency for NOK (Tripletex default) — sending it causes 500.
-                # For foreign currencies, include with the exchange rate factor.
-                "currency": {"code": currency_code, "factor": 1} if currency_code != "NOK" else None,
+                "invoiceAmount": args.get("amountCurrency"),
                 "invoiceNumber": args.get("invoiceNumber"),
-                "kid": args.get("kid"),
+                "description": args.get("description"),
+                "dueDate": args.get("dueDate"),
             })
+            # Handle foreign currency
+            if currency_code != "NOK":
+                try:
+                    curr = client.get("/currency", params={"code": currency_code, "fields": "id", "count": 1})
+                    curr_values = (curr or {}).get("values", [])
+                    if curr_values:
+                        header["currencyId"] = curr_values[0]["id"]
+                except TripletexError:
+                    pass
+            ii_body: dict = {"invoiceHeader": header}
+            # Add order line if account_id provided
+            if args.get("account_id"):
+                order_line: dict = {
+                    "accountId": args["account_id"],
+                    "amountInclVat": args.get("amountCurrency"),
+                }
+                if args.get("vatTypeId"):
+                    order_line["vatTypeId"] = args["vatTypeId"]
+                if args.get("description"):
+                    order_line["description"] = args["description"]
+                ii_body["orderLines"] = [order_line]
             try:
-                return client.post("/supplierInvoice", body)
+                return client.post("/incomingInvoice", ii_body)
             except TripletexError as exc:
                 if exc.status_code >= 500:
-                    # Endpoint is permanently broken — fail fast, no retries.
-                    # Guide model to use manual voucher as fallback.
-                    logger.warning("Supplier invoice 500 — returning voucher fallback guidance")
+                    logger.warning("incomingInvoice 500 — returning voucher fallback guidance")
                     return {
                         "success": False,
                         "error": (
-                            "supplierInvoice endpoint returned 500 (known issue). "
+                            "incomingInvoice endpoint returned 500. "
                             "FALLBACK: Create a manual voucher instead with tripletex_create_voucher: "
                             "debit the appropriate expense/asset account (e.g. 4300 for goods, "
                             "6300 for services, 1200 for assets), credit 2400 (leverandørgjeld/AP). "
@@ -1074,14 +1104,29 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             # Include travelDetails to create a "reiseregning" (not "ansattutlegg")
             # Per diem compensation only works on reiseregning type
             # typeOfTravel does NOT exist on the DTO — travelDetails is what sets the type
-            return client.post("/travelExpense", {
+            travel_details: dict = {
+                "isForeignTravel": False,
+                "isDayTrip": False,
+                "isCompensationFromRates": True,
+            }
+            # Pass through optional travel detail fields from the task
+            if args.get("departureDate"):
+                travel_details["departureDate"] = args["departureDate"]
+            if args.get("returnDate"):
+                travel_details["returnDate"] = args["returnDate"]
+            if args.get("departureFrom"):
+                travel_details["departureFrom"] = args["departureFrom"]
+            if args.get("destination"):
+                travel_details["destination"] = args["destination"]
+            if args.get("purpose"):
+                travel_details["purpose"] = args["purpose"]
+            te_body: dict = {
                 "employee": {"id": args["employee_id"]},
-                "travelDetails": {
-                    "isForeignTravel": False,
-                    "isDayTrip": False,
-                    "isCompensationFromRates": True,
-                },
-            })
+                "travelDetails": travel_details,
+            }
+            if args.get("title"):
+                te_body["title"] = args["title"]
+            return client.post("/travelExpense", te_body)
 
         case "tripletex_delete_travel_expense":
             client.delete(f"/travelExpense/{args['id']}")
@@ -1263,6 +1308,22 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             # Redirect /company/division → /division (model keeps using wrong path)
             if path.rstrip("/") in ("/company/division", "/company/divisions"):
                 path = "/division"
+
+            # Redirect POST /supplierInvoice → /incomingInvoice (correct endpoint)
+            if method == "POST" and path.rstrip("/") == "/supplierInvoice":
+                # Transform old body format to new IncomingInvoice format
+                supplier_ref = body.get("supplier") or {}
+                vendor_id = supplier_ref.get("id") or body.get("vendorId")
+                header = {
+                    "vendorId": vendor_id,
+                    "invoiceDate": body.get("invoiceDate"),
+                    "invoiceAmount": body.get("amountCurrency"),
+                }
+                if body.get("invoiceNumber"):
+                    header["invoiceNumber"] = body["invoiceNumber"]
+                path = "/incomingInvoice"
+                body = {"invoiceHeader": header}
+                logger.info("Redirected POST /supplierInvoice → /incomingInvoice")
 
             # Block endpoints that don't exist or are proxy-blocked — prevent wasted iterations
             blocked_paths = {

@@ -135,13 +135,15 @@ Chain: customer → product → order → invoice → [send] → [payment]
 ═══ SUPPLIERS ═══
 • Supplier ≠ Customer. "leverandør/fornecedor/fournisseur/Lieferant" → tripletex_create_supplier.
 • Supplier invoice ("leverandørfaktura/inngående faktura/factura del proveedor"): \
-  Try tripletex_create_supplier_invoice first. \
+  Use tripletex_create_supplier_invoice (uses POST /incomingInvoice internally). \
   Required: supplier_id, invoiceDate, amountCurrency (total WITH VAT). \
-  NEVER include: dueDate, description, amountExcludingVatCurrency.
+  Optional but recommended: description, dueDate, account_id (expense account), vatTypeId. \
+  To find the expense account: tripletex_list_accounts(number=43) for goods, 63 for services, 12 for assets. \
+  To find VAT type: tripletex_api_call GET /ledger/vatType. Use inngående MVA (input VAT) for expenses.
 • For NOK: omit currency_code. For foreign: set currency_code="EUR" etc.
-• If supplierInvoice returns 500: it will give you fallback instructions. \
-  Use tripletex_create_voucher instead: debit expense account (4300 goods, 6300 services, \
-  1200 assets), credit 2400 (leverandørgjeld/AP). Include VAT. Do NOT retry the endpoint.
+• If the endpoint returns 500: it will give you fallback instructions. \
+  Use tripletex_create_voucher instead: debit expense account, credit 2400 (leverandørgjeld/AP). \
+  Include VAT. Do NOT retry the endpoint.
 
 ═══ PROJECTS ═══
 • tripletex_create_project requires name + startDate. \
@@ -237,8 +239,10 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Always complete ALL steps described in the task — depreciation, accruals, reversals, etc.
 
 ═══ TRAVEL EXPENSES ═══
-• Create: tripletex_create_travel_expense(employee_id) — creates a reiseregning (travel report). \
-  The tool auto-sets travelDetails (required for per diem compensation). \
+• Create: tripletex_create_travel_expense(employee_id, title, departureDate, returnDate, \
+  departureFrom, destination, purpose) — creates a reiseregning (travel report). \
+  ALWAYS set title, dates, departure/destination, and purpose from the task prompt — these are SCORED. \
+  The tool auto-sets travelDetails for per diem compatibility. \
   ALWAYS use this dedicated tool — do NOT use tripletex_api_call to create travel expenses.
 • Adding costs: tripletex_api_call POST /travelExpense/cost with body: \
   {{"travelExpense":{{"id":TE_ID}},"costCategory":{{"id":CAT_ID}}, \
