@@ -816,10 +816,16 @@ def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
             div_values = []
 
         if not div_values:
-            logger.warning("No divisions found — cannot fix salary division error")
-            return False
-
-        div_id = div_values[0]["id"]
+            # Try to create a division
+            try:
+                div_resp = client.post("/division", {"name": "Hovedkontor", "organizationNumber": ""})
+                div_id = div_resp["value"]["id"]
+                logger.info(f"Auto-created division 'Hovedkontor' (ID={div_id})")
+            except TripletexError:
+                logger.warning("No divisions found and cannot create one — salary division fix failed")
+                return False
+        else:
+            div_id = div_values[0]["id"]
 
         # Find the employee's employment record
         emps = client.get("/employee/employment", params={
@@ -1386,10 +1392,23 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             return result
 
         case "tripletex_list_vouchers":
+            fields = args.get("fields", "id,date,description,postings")
+            # Strip invalid VoucherDTO fields that cause 400
+            bad_voucher_fields = {"amount", "accountId", "account"}
+            parts = [f.strip() for f in fields.split(",")]
+            # Deduplicate fields (duplicate "number" causes 400)
+            seen = set()
+            clean_parts = []
+            for f in parts:
+                base = f.split("(")[0].strip()  # handle nested like postings(...)
+                if base not in bad_voucher_fields and base not in seen:
+                    seen.add(base)
+                    clean_parts.append(f)
+            fields = ",".join(clean_parts)
             return client.get("/ledger/voucher", params={
                 "dateFrom": args.get("dateFrom"),
                 "dateTo": args.get("dateTo"),
-                "fields": args.get("fields", "id,date,description,postings"),
+                "fields": fields,
                 "count": args.get("count", 100),
             })
 
@@ -1413,11 +1432,15 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             return client.post("/ledger/voucher", body)
 
         case "tripletex_list_postings":
+            fields = args.get("fields", "id,date,description,amount,account")
+            # Fix common model mistakes in fields
+            fields = fields.replace("accountId", "account")
+            fields = fields.replace("account.number", "account")
             return client.get("/ledger/posting", params={
                 "dateFrom": args.get("dateFrom"),
                 "dateTo": args.get("dateTo"),
-                "fields": args.get("fields", "id,date,description,amount,account"),
-                "count": 20,
+                "fields": fields,
+                "count": 1000,
             })
 
         # ── Generic escape hatch ──────────────────────────────────────────────
@@ -1427,6 +1450,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             path = args["path"]
             params = args.get("params") or {}
             body = args.get("body") or {}
+
+            # Redirect /company/division → /division (model keeps using wrong path)
+            if path.rstrip("/") in ("/company/division", "/company/divisions"):
+                path = "/division"
 
             # BLOCK POST /ledger/account — accounts are pre-populated in the
             # chart of accounts and must NEVER be created via the API.
@@ -1480,17 +1507,37 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                         if div_values:
                             body["division"] = {"id": div_values[0]["id"]}
                             logger.info(f"Auto-linked employment to division {div_values[0]['id']}")
+                        else:
+                            # No divisions exist — create one
+                            try:
+                                div_resp = client.post("/division", {"name": "Hovedkontor", "organizationNumber": ""})
+                                div_id = div_resp["value"]["id"]
+                                body["division"] = {"id": div_id}
+                                logger.info(f"Auto-created division 'Hovedkontor' (ID={div_id}) for employment")
+                            except TripletexError:
+                                logger.warning("Could not create division for employment — salary may fail later")
                     except TripletexError:
                         logger.warning("Could not find division for employment — salary may fail later")
 
-            # Intercept POST /employee/employment/details — auto-rename
+            # Intercept PUT /employee/employment/{id} — strip invalid fields
+            if method == "PUT" and "/employee/employment/" in path and "/details" not in path:
+                for bad_field in ("department", "division", "percentageOfFullTimeEquivalent",
+                                  "positionPercentage", "positionCode", "annualSalary"):
+                    body.pop(bad_field, None)
+
+            # Intercept POST/PUT /employee/employment/details — auto-rename
             # positionPercentage → percentageOfFullTimeEquivalent
-            if method == "POST" and "/employment/details" in path:
+            if "/employment/details" in path:
                 if "positionPercentage" in body and "percentageOfFullTimeEquivalent" not in body:
                     body["percentageOfFullTimeEquivalent"] = body.pop("positionPercentage")
                 # Strip fields that don't belong on details endpoint
-                for bad_field in ("annualSalary", "positionCode"):
+                for bad_field in ("annualSalary", "positionCode", "hoursPerDay",
+                                  "department", "division"):
                     body.pop(bad_field, None)
+                # Fix occupationCode — must be object reference, not raw value
+                occ = body.get("occupationCode")
+                if occ is not None and not isinstance(occ, dict):
+                    body.pop("occupationCode", None)  # Strip invalid type
 
             # Intercept POST /salary/transaction — auto-fix division on employment
             if method == "POST" and path.rstrip("/") == "/salary/transaction":

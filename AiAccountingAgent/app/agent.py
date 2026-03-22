@@ -78,12 +78,19 @@ if the auto-fix also fails, in which case follow the error message guidance:
 ═══ EMPLOYMENT RECORDS ═══
 • Step 1: POST /employee/employment — body: {{"employee":{{"id":X}},"startDate":"YYYY-MM-DD"}} \
   Do NOT include division.id, percentageOfFullTimeEquivalent, positionPercentage, \
-  positionCode, annualSalary — ALL cause 422 on this endpoint.
+  positionCode, annualSalary — ALL cause 422 on this endpoint. Division is auto-set.
 • Step 2 (if task requires position %): POST /employee/employment/details with body: \
   {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD","percentageOfFullTimeEquivalent":100.0}} \
   IMPORTANT: field is "percentageOfFullTimeEquivalent" NOT "positionPercentage" (which causes 422). \
-  Do NOT include annualSalary, positionCode on this endpoint either.
-• Never use PUT /employee/employment/{{id}} — always fails.
+  Do NOT include: annualSalary, positionCode, hoursPerDay, department, division, occupationCode \
+  — NONE of these exist on the employment details DTO and ALL cause 422.
+• To set annual salary: PUT /employee/employment/details/{{id}} with \
+  {{"id":X,"version":Y,"percentageOfFullTimeEquivalent":Z,"annualSalary":AMOUNT}} — \
+  annualSalary is ONLY valid on PUT update, NOT on initial POST.
+• Never use PUT /employee/employment/{{id}} for department/division — those fields don't exist there.
+• Occupation code (STYRK): GET /employee/employment/occupationCode?code=XXXX to find it, \
+  then reference as {{"occupationCode":{{"id":ID}}}} — NOT as a raw number or string. \
+  The endpoint /occupationCode does NOT exist (404). Use /employee/employment/occupationCode.
 
 ═══ INVOICING ═══
 Chain: customer → product → order → invoice → [send] → [payment]
@@ -234,14 +241,20 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Paths: NEVER prefix with /v2/. Use /employee NOT /v2/employee.
 • NEVER CREATE ACCOUNTS: POST /ledger/account is FORBIDDEN. Accounts are pre-populated. \
   Use tripletex_list_accounts to find them.
+• DIVISION: Use /division NOT /company/division or /company/divisions (those cause 422).
+• OCCUPATION CODE: Use /employee/employment/occupationCode NOT /occupationCode (causes 404).
 • NON-EXISTENT ENDPOINTS (cause 404/422 — NEVER use these): \
   /invoice/{{id}}/payment, /invoice/payment, /employee/{{id}}/loggedInUser, \
-  /employee/employment/employmentDetails, /v2/ledger/account, /v2/currency.
+  /employee/employment/employmentDetails, /v2/ledger/account, /v2/currency, \
+  /company/division, /company/divisions, /occupationCode.
 • Listing: invoices require invoiceDateFrom + invoiceDateTo.
 • Invalid list fields: dueDate, isPaid, amountOutstanding (cause 400).
 • Ledger postings: do NOT request account.number (causes 400).
 • Voucher fields syntax: use fields like "id,date,description,postings" (flat). \
-  NEVER use nested syntax like "postings{{account{{id" — it causes 400.
+  NEVER use nested syntax like "postings{{account{{id" — it causes 400. \
+  Invalid VoucherDTO fields: "amount", "accountId" — these do NOT exist on VoucherDTO. \
+  The amounts are inside the postings array, not on the voucher itself.
+• Ledger postings fields: use "account" NOT "accountId" or "account.number" (both cause 400).
 • Product numbers: ONLY set if task explicitly provides one.
 • Order price via api_call: field is unitPriceExcludingVatCurrency.
 • On 403: session expired, STOP immediately.
