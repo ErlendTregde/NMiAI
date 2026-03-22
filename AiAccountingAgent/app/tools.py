@@ -1,13 +1,13 @@
 """
-Gemini function/tool declarations for the Tripletex v2 API.
+Tool declarations and dispatch for the Tripletex v2 API.
 
 Two exports:
-  TOOLS          — types.Tool passed to Gemini generate_content()
-  execute_tool() — dispatches a function call to the TripletexClient
+  CLAUDE_TOOLS   — list of tool dicts for Claude messages API
+  execute_tool() — dispatches a tool call to the TripletexClient
 
 Design rules:
   • Every tool returns {"success": True, "data": ...} or {"success": False, "error": "..."}
-  • Errors are returned AS TOOL RESULTS (not raised) so Gemini can self-correct
+  • Errors are returned AS TOOL RESULTS so the model can self-correct
   • No blind retries here — the model decides whether and how to retry
   • A generic escape-hatch tool (tripletex_api_call) handles anything not
     explicitly mapped, including enabling modules and setting employee roles
@@ -16,631 +16,386 @@ import json
 import logging
 from typing import Any
 
-from google.genai import types
-
 from .tripletex.client import TripletexClient
 from .tripletex.errors import TripletexError
 
 logger = logging.getLogger(__name__)
 
-# ── Type aliases for brevity ───────────────────────────────────────────────────
-_S = types.Type.STRING
-_I = types.Type.INTEGER
-_N = types.Type.NUMBER
-_B = types.Type.BOOLEAN
-_A = types.Type.ARRAY
-_O = types.Type.OBJECT
 
+# ── Tool declarations (Claude JSON Schema format) ────────────────────────────
 
-def _s(desc: str, **kw) -> types.Schema:
-    return types.Schema(type=_S, description=desc, **kw)
-
-def _i(desc: str) -> types.Schema:
-    return types.Schema(type=_I, description=desc)
-
-def _n(desc: str) -> types.Schema:
-    return types.Schema(type=_N, description=desc)
-
-def _b(desc: str) -> types.Schema:
-    return types.Schema(type=_B, description=desc)
-
-def _obj(props: dict, required: list[str] | None = None, desc: str = "") -> types.Schema:
-    kw: dict = {"type": _O, "properties": props}
-    if desc:
-        kw["description"] = desc
-    if required:
-        kw["required"] = required
-    return types.Schema(**kw)
-
-def _arr(items: types.Schema, desc: str = "") -> types.Schema:
-    kw: dict = {"type": _A, "items": items}
-    if desc:
-        kw["description"] = desc
-    return types.Schema(**kw)
-
-
-# ── Tool declarations ──────────────────────────────────────────────────────────
-
-_DECLARATIONS = [
+CLAUDE_TOOLS = [
 
     # ── Employees ─────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_employees",
-        description="List employees. Use to find an employee by name before updating or deleting.",
-        parameters=_obj({
-            "name": _s("Filter by full or partial name"),
-            "fields": _s("Comma-separated fields, e.g. 'id,firstName,lastName,email'"),
-        }),
-    ),
+    {"name": "tripletex_list_employees",
+     "description": "List employees. Use to find an employee by name before updating or deleting.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Filter by full or partial name"},
+         "fields": {"type": "string", "description": "Comma-separated fields, e.g. 'id,firstName,lastName,email'"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_get_employee",
-        description="Get a single employee by ID. Use when you need the version number for a PUT.",
-        parameters=_obj({"id": _i("Employee ID"), "fields": _s("Fields to return")}, required=["id"]),
-    ),
+    {"name": "tripletex_get_employee",
+     "description": "Get a single employee by ID. Use when you need the version number for a PUT.",
+     "input_schema": {"type": "object", "properties": {
+         "id": {"type": "integer", "description": "Employee ID"},
+         "fields": {"type": "string", "description": "Fields to return"},
+     }, "required": ["id"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_employee",
-        description=(
-            "Create a new employee. "
-            "IMPORTANT: If the task says the employee should be 'kontoadministrator' or "
-            "'administrator', after creating call tripletex_grant_entitlement to grant the role "
-            "(first GET /employee/entitlement to find the entitlement ID)."
-        ),
-        parameters=_obj(
-            {
-                "firstName": _s("First name"),
-                "lastName": _s("Last name"),
-                "email": _s("Email address"),
-                "userTypeId": _i("User type integer ID. Default 1 (standard employee). Use 1 unless the task explicitly requires a different type."),
-                "departmentId": _i("Department ID to assign employee to — optional"),
-                "employeeNumber": _s("Employee number (optional)"),
-                "phoneNumberMobile": _s("Mobile phone number"),
-                "phoneNumberHome": _s("Home phone number"),
-                "phoneNumberWork": _s("Work phone number"),
-                "dateOfBirth": _s("Date of birth (YYYY-MM-DD) — from employment contract"),
-                "nationalIdentityNumber": _s("Norwegian national identity number / personnummer — from employment contract"),
-                "bankAccountNumber": _s("Employee's personal bank account number — from employment contract"),
-            },
-            required=["firstName", "lastName"],
-        ),
-    ),
+    {"name": "tripletex_create_employee",
+     "description": (
+         "Create a new employee. "
+         "IMPORTANT: If the task says the employee should be 'kontoadministrator' or "
+         "'administrator', after creating call tripletex_grant_entitlement to grant the role "
+         "(first GET /employee/entitlement to find the entitlement ID)."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "firstName": {"type": "string", "description": "First name"},
+         "lastName": {"type": "string", "description": "Last name"},
+         "email": {"type": "string", "description": "Email address"},
+         "userTypeId": {"type": "integer", "description": "User type ID. Default 1 (standard employee)."},
+         "departmentId": {"type": "integer", "description": "Department ID — optional"},
+         "employeeNumber": {"type": "string", "description": "Employee number (optional)"},
+         "phoneNumberMobile": {"type": "string", "description": "Mobile phone number"},
+         "phoneNumberHome": {"type": "string", "description": "Home phone number"},
+         "phoneNumberWork": {"type": "string", "description": "Work phone number"},
+         "dateOfBirth": {"type": "string", "description": "Date of birth (YYYY-MM-DD)"},
+         "nationalIdentityNumber": {"type": "string", "description": "Norwegian national identity number / personnummer"},
+         "bankAccountNumber": {"type": "string", "description": "Employee's personal bank account number"},
+     }, "required": ["firstName", "lastName"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_grant_entitlement",
-        description=(
-            "Grant a role or access entitlement to an employee. "
-            "Use this to grant 'kontoadministrator' (admin) or 'project manager' access. "
-            "Step 1: call tripletex_api_call GET /employee/entitlement to list available "
-            "entitlement IDs for this account. "
-            "Step 2: call this tool with the employee_id and the correct entitlement_id. "
-            "IMPORTANT: For project manager — grant the entitlement BEFORE creating "
-            "the project with that employee as projectManager."
-        ),
-        parameters=_obj(
-            {
-                "employee_id": _i("Employee ID to grant the entitlement to"),
-                "entitlement_id": _i("Entitlement ID (discover via GET /employee/entitlement)"),
-            },
-            required=["employee_id", "entitlement_id"],
-        ),
-    ),
+    {"name": "tripletex_grant_entitlement",
+     "description": (
+         "Grant a role or access entitlement to an employee. "
+         "Step 1: call tripletex_api_call GET /employee/entitlement to list available entitlement IDs. "
+         "Step 2: call this tool with the employee_id and the correct entitlement_id. "
+         "IMPORTANT: For project manager — grant the entitlement BEFORE creating the project."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "employee_id": {"type": "integer", "description": "Employee ID"},
+         "entitlement_id": {"type": "integer", "description": "Entitlement ID (discover via GET /employee/entitlement)"},
+     }, "required": ["employee_id", "entitlement_id"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_update_employee",
-        description=(
-            "Update an existing employee. "
-            "Requires the current version number — GET the employee first to obtain it. "
-            "INVALID fields (cause 422): annualSalary, salary, wage — salary is handled via "
-            "/salary/transaction, NOT via the employee record."
-        ),
-        parameters=_obj(
-            {
-                "id": _i("Employee ID"),
-                "version": _i("Current version (required for optimistic locking)"),
-                "firstName": _s("First name"),
-                "lastName": _s("Last name"),
-                "email": _s("Email address"),
-                "phoneNumberMobile": _s("Mobile phone"),
-                "phoneNumberHome": _s("Home phone"),
-                "phoneNumberWork": _s("Work phone"),
-                "dateOfBirth": _s("Date of birth (YYYY-MM-DD)"),
-                "nationalIdentityNumber": _s("Norwegian national identity number / personnummer"),
-                "bankAccountNumber": _s("Employee's personal bank account number"),
-            },
-            required=["id", "version"],
-        ),
-    ),
+    {"name": "tripletex_update_employee",
+     "description": (
+         "Update an existing employee. Requires version number — GET the employee first. "
+         "INVALID fields (cause 422): annualSalary, salary, wage."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "id": {"type": "integer", "description": "Employee ID"},
+         "version": {"type": "integer", "description": "Current version (optimistic locking)"},
+         "firstName": {"type": "string", "description": "First name"},
+         "lastName": {"type": "string", "description": "Last name"},
+         "email": {"type": "string", "description": "Email address"},
+         "phoneNumberMobile": {"type": "string", "description": "Mobile phone"},
+         "phoneNumberHome": {"type": "string", "description": "Home phone"},
+         "phoneNumberWork": {"type": "string", "description": "Work phone"},
+         "dateOfBirth": {"type": "string", "description": "Date of birth (YYYY-MM-DD)"},
+         "nationalIdentityNumber": {"type": "string", "description": "Norwegian national identity number"},
+         "bankAccountNumber": {"type": "string", "description": "Bank account number"},
+     }, "required": ["id", "version"]}},
 
     # ── Suppliers ─────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_create_supplier",
-        description=(
-            "Create a new SUPPLIER (leverandør / fornecedor / fournisseur / Lieferant). "
-            "Use this when the task says 'supplier', 'leverandør', 'fornecedor', 'fournisseur', or 'Lieferant'. "
-            "Do NOT use tripletex_create_customer for suppliers — they are different entities."
-        ),
-        parameters=_obj(
-            {
-                "name": _s("Supplier / company name"),
-                "email": _s("Email address"),
-                "organizationNumber": _s("Norwegian org. number (9 digits)"),
-                "phoneNumber": _s("Phone number"),
-            },
-            required=["name"],
-        ),
-    ),
+    {"name": "tripletex_create_supplier",
+     "description": "Create a new SUPPLIER (leverandør / fornecedor / fournisseur / Lieferant). Do NOT use tripletex_create_customer for suppliers.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Supplier / company name"},
+         "email": {"type": "string", "description": "Email address"},
+         "organizationNumber": {"type": "string", "description": "Norwegian org. number (9 digits)"},
+         "phoneNumber": {"type": "string", "description": "Phone number"},
+     }, "required": ["name"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_supplier_invoice",
-        description=(
-            "Register an incoming supplier invoice (leverandørfaktura / inngående faktura). "
-            "Use when the task says 'register invoice from supplier', 'book incoming invoice', "
-            "'registrer leverandørfaktura', or similar. "
-            "This creates the invoice in Tripletex and auto-generates the AP accounting entries. "
-            "After creating, you can approve it via tripletex_api_call PUT /supplierInvoice/{id}/:approve."
-        ),
-        parameters=_obj(
-            {
-                "supplier_id": _i("Supplier ID (create supplier first if needed)"),
-                "invoiceDate": _s("Invoice date (YYYY-MM-DD)"),
-                "amountCurrency": _n("Total invoice amount INCLUDING VAT. Do NOT compute or pass amountExcludingVatCurrency — send only the total."),
-                "currency_code": _s("Currency code, e.g. 'NOK', 'EUR', 'USD' — defaults to NOK. Omit for NOK."),
-                "invoiceNumber": _s("Supplier's invoice number — optional"),
-                "kid": _s("Payment reference / KID number — optional"),
-            },
-            required=["supplier_id", "invoiceDate", "amountCurrency"],
-        ),
-    ),
+    {"name": "tripletex_create_supplier_invoice",
+     "description": (
+         "Register an incoming supplier invoice (leverandørfaktura / inngående faktura). "
+         "Creates the invoice and auto-generates AP accounting entries."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "supplier_id": {"type": "integer", "description": "Supplier ID"},
+         "invoiceDate": {"type": "string", "description": "Invoice date (YYYY-MM-DD)"},
+         "amountCurrency": {"type": "number", "description": "Total amount INCLUDING VAT"},
+         "currency_code": {"type": "string", "description": "Currency code (e.g. 'EUR'). Omit for NOK."},
+         "invoiceNumber": {"type": "string", "description": "Supplier's invoice number — optional"},
+         "kid": {"type": "string", "description": "Payment reference / KID — optional"},
+     }, "required": ["supplier_id", "invoiceDate", "amountCurrency"]}},
 
     # ── Customers ─────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_customers",
-        description="List customers. Use to find an existing customer by name.",
-        parameters=_obj({
-            "name": _s("Filter by name (partial match)"),
-            "fields": _s("Fields to return, e.g. 'id,name,email'"),
-        }),
-    ),
+    {"name": "tripletex_list_customers",
+     "description": "List customers. Use to find an existing customer by name.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Filter by name (partial match)"},
+         "fields": {"type": "string", "description": "Fields to return, e.g. 'id,name,email'"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_customer",
-        description="Create a new customer (company or individual).",
-        parameters=_obj(
-            {
-                "name": _s("Customer / company name"),
-                "email": _s("Email address"),
-                "organizationNumber": _s("Norwegian org. number (9 digits)"),
-                "phoneNumber": _s("Phone number"),
-                "address": _s("Street address line"),
-                "postalCode": _s("Postal code"),
-                "city": _s("City"),
-                "description": _s("Customer description / notes — optional"),
-            },
-            required=["name"],
-        ),
-    ),
+    {"name": "tripletex_create_customer",
+     "description": "Create a new customer (company or individual).",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Customer / company name"},
+         "email": {"type": "string", "description": "Email address"},
+         "organizationNumber": {"type": "string", "description": "Norwegian org. number (9 digits)"},
+         "phoneNumber": {"type": "string", "description": "Phone number"},
+         "address": {"type": "string", "description": "Street address line"},
+         "postalCode": {"type": "string", "description": "Postal code"},
+         "city": {"type": "string", "description": "City"},
+         "description": {"type": "string", "description": "Customer description / notes"},
+     }, "required": ["name"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_update_customer",
-        description="Update an existing customer. Requires version from a prior GET.",
-        parameters=_obj(
-            {
-                "id": _i("Customer ID"),
-                "version": _i("Current version number"),
-                "name": _s("Customer name"),
-                "email": _s("Email"),
-                "phoneNumber": _s("Phone number"),
-                "address": _s("Street address"),
-                "description": _s("Customer description / notes"),
-            },
-            required=["id", "version"],
-        ),
-    ),
+    {"name": "tripletex_update_customer",
+     "description": "Update an existing customer. Requires version from a prior GET.",
+     "input_schema": {"type": "object", "properties": {
+         "id": {"type": "integer", "description": "Customer ID"},
+         "version": {"type": "integer", "description": "Current version number"},
+         "name": {"type": "string", "description": "Customer name"},
+         "email": {"type": "string", "description": "Email"},
+         "phoneNumber": {"type": "string", "description": "Phone number"},
+         "address": {"type": "string", "description": "Street address"},
+         "description": {"type": "string", "description": "Customer description / notes"},
+     }, "required": ["id", "version"]}},
 
     # ── Products ──────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_products",
-        description="List products.",
-        parameters=_obj({
-            "name": _s("Filter by name"),
-            "fields": _s("Fields to return"),
-        }),
-    ),
+    {"name": "tripletex_list_products",
+     "description": "List products.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Filter by name"},
+         "fields": {"type": "string", "description": "Fields to return"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_product",
-        description=(
-            "Create a new product. "
-            "The 'number' field is optional — only set it if the task explicitly gives a specific product number. "
-            "For non-standard VAT rates (15%, 0%, etc.) query GET /ledger/vatType to find the correct vatTypeId."
-        ),
-        parameters=_obj(
-            {
-                "name": _s("Product name"),
-                "number": _s("Product number — ONLY set if the task explicitly provides a specific number. Omit to let Tripletex auto-assign."),
-                "priceExcludingVatCurrency": _n("Sales price excluding VAT"),
-                "costExcludingVatCurrency": _n("Cost price excluding VAT"),
-                "vatTypeId": _i("VAT type ID. 3 = standard 25% Norwegian VAT. Query GET /ledger/vatType for other rates."),
-            },
-            required=["name"],
-        ),
-    ),
+    {"name": "tripletex_create_product",
+     "description": "Create a new product. Only set 'number' if the task explicitly provides one.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Product name"},
+         "number": {"type": "string", "description": "Product number — only if task provides one"},
+         "priceExcludingVatCurrency": {"type": "number", "description": "Sales price excluding VAT"},
+         "costExcludingVatCurrency": {"type": "number", "description": "Cost price excluding VAT"},
+         "vatTypeId": {"type": "integer", "description": "VAT type ID. 3 = 25% Norwegian VAT."},
+     }, "required": ["name"]}},
 
     # ── Orders ────────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_create_order",
-        description=(
-            "Create an order for a customer. "
-            "An order is REQUIRED before you can create an invoice. "
-            "Order lines specify what products or services are being sold."
-        ),
-        parameters=_obj(
-            {
-                "customer_id": _i("Customer ID"),
-                "orderDate": _s("Order date (YYYY-MM-DD)"),
-                "deliveryDate": _s("Delivery date (YYYY-MM-DD) — optional"),
-                "currency_id": _i("Currency ID for foreign currency orders — find with GET /currency?code=EUR. Omit for NOK."),
-                "orderLines": _arr(
-                    _obj({
-                        "product_id": _i("Product ID — omit for free-text lines"),
-                        "description": _s("Line item description"),
-                        "count": _n("Quantity"),
-                        "unitPriceExcludingVat": _n("Unit price excluding VAT"),
-                        "vatTypeId": _i("VAT type ID (3 = 25%)"),
-                    }),
-                    desc="List of order lines",
-                ),
-            },
-            required=["customer_id", "orderDate"],
-        ),
-    ),
+    {"name": "tripletex_create_order",
+     "description": "Create an order for a customer. An order is REQUIRED before creating an invoice.",
+     "input_schema": {"type": "object", "properties": {
+         "customer_id": {"type": "integer", "description": "Customer ID"},
+         "orderDate": {"type": "string", "description": "Order date (YYYY-MM-DD)"},
+         "deliveryDate": {"type": "string", "description": "Delivery date (YYYY-MM-DD) — optional"},
+         "currency_id": {"type": "integer", "description": "Currency ID for foreign currency orders. Omit for NOK."},
+         "orderLines": {"type": "array", "description": "Order lines", "items": {
+             "type": "object", "properties": {
+                 "product_id": {"type": "integer", "description": "Product ID — omit for free-text lines"},
+                 "description": {"type": "string", "description": "Line item description"},
+                 "count": {"type": "number", "description": "Quantity"},
+                 "unitPriceExcludingVat": {"type": "number", "description": "Unit price excluding VAT"},
+                 "vatTypeId": {"type": "integer", "description": "VAT type ID (3 = 25%)"},
+             }}},
+     }, "required": ["customer_id", "orderDate"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_get_order",
-        description="Get order details by ID.",
-        parameters=_obj(
-            {"id": _i("Order ID"), "fields": _s("Fields to return")},
-            required=["id"],
-        ),
-    ),
+    {"name": "tripletex_get_order",
+     "description": "Get order details by ID.",
+     "input_schema": {"type": "object", "properties": {
+         "id": {"type": "integer", "description": "Order ID"},
+         "fields": {"type": "string", "description": "Fields to return"},
+     }, "required": ["id"]}},
 
     # ── Invoices ──────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_create_invoice",
-        description=(
-            "Create an invoice from an existing order. "
-            "You MUST have an order_id — create the order first if needed. "
-            "Full chain: create customer → create product → create order → create invoice. "
-            "To send the invoice to the customer, call tripletex_send_invoice AFTER creation."
-        ),
-        parameters=_obj(
-            {
-                "order_id": _i("Order ID to invoice"),
-                "invoiceDate": _s("Invoice date (YYYY-MM-DD)"),
-                "invoiceDueDate": _s("Payment due date (YYYY-MM-DD)"),
-            },
-            required=["order_id", "invoiceDate"],
-        ),
-    ),
+    {"name": "tripletex_create_invoice",
+     "description": "Create an invoice from an existing order. Chain: customer → product → order → invoice.",
+     "input_schema": {"type": "object", "properties": {
+         "order_id": {"type": "integer", "description": "Order ID to invoice"},
+         "invoiceDate": {"type": "string", "description": "Invoice date (YYYY-MM-DD)"},
+         "invoiceDueDate": {"type": "string", "description": "Payment due date (YYYY-MM-DD)"},
+     }, "required": ["order_id", "invoiceDate"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_list_invoices",
-        description=(
-            "List invoices. invoiceDateFrom and invoiceDateTo are REQUIRED by the API. "
-            "INVALID fields (cause 400): dueDate, isPaid, amountOutstanding, amountOutstandingCurrency — auto-stripped. "
-            "Valid fields: id, invoiceDate, invoiceDueDate, amountCurrency, customer, amount, invoiceNumber."
-        ),
-        parameters=_obj({
-            "invoiceDateFrom": _s("Start date filter (YYYY-MM-DD) — REQUIRED"),
-            "invoiceDateTo": _s("End date filter (YYYY-MM-DD) — REQUIRED"),
-            "customerId": _i("Filter by customer ID — optional"),
-            "fields": _s("Fields to return. AVOID: dueDate, isPaid, amountOutstanding (cause 400)"),
-            "count": _i("Max number of results"),
-        }),
-    ),
+    {"name": "tripletex_list_invoices",
+     "description": (
+         "List invoices. invoiceDateFrom and invoiceDateTo are REQUIRED. "
+         "Valid fields: id, invoiceDate, invoiceDueDate, amountCurrency, customer, amount, invoiceNumber."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "invoiceDateFrom": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
+         "invoiceDateTo": {"type": "string", "description": "End date (YYYY-MM-DD)"},
+         "customerId": {"type": "integer", "description": "Filter by customer ID — optional"},
+         "fields": {"type": "string", "description": "Fields to return"},
+         "count": {"type": "integer", "description": "Max results"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_send_invoice",
-        description="Send an invoice to the customer.",
-        parameters=_obj(
-            {
-                "invoice_id": _i("Invoice ID"),
-                "sendType": _s("Send method", enum=["EMAIL", "EHF", "EFAKTURA", "AVTALEGIRO"]),
-                "recipientEmail": _s("Override recipient email — optional"),
-            },
-            required=["invoice_id", "sendType"],
-        ),
-    ),
+    {"name": "tripletex_send_invoice",
+     "description": "Send an invoice to the customer.",
+     "input_schema": {"type": "object", "properties": {
+         "invoice_id": {"type": "integer", "description": "Invoice ID"},
+         "sendType": {"type": "string", "enum": ["EMAIL", "EHF", "EFAKTURA", "AVTALEGIRO"], "description": "Send method"},
+         "recipientEmail": {"type": "string", "description": "Override recipient email — optional"},
+     }, "required": ["invoice_id", "sendType"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_credit_note",
-        description="Create a credit note (reversal / kreditnota) for an invoice.",
-        parameters=_obj(
-            {
-                "invoice_id": _i("Invoice ID to reverse"),
-                "date": _s("Credit note date (YYYY-MM-DD)"),
-                "comment": _s("Reason for credit note — optional"),
-            },
-            required=["invoice_id", "date"],
-        ),
-    ),
+    {"name": "tripletex_create_credit_note",
+     "description": "Create a credit note (reversal / kreditnota) for an invoice.",
+     "input_schema": {"type": "object", "properties": {
+         "invoice_id": {"type": "integer", "description": "Invoice ID to reverse"},
+         "date": {"type": "string", "description": "Credit note date (YYYY-MM-DD)"},
+         "comment": {"type": "string", "description": "Reason — optional"},
+     }, "required": ["invoice_id", "date"]}},
 
     # ── Payments ──────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_register_payment",
-        description="Register a payment against an invoice.",
-        parameters=_obj(
-            {
-                "invoice_id": _i("Invoice ID"),
-                "paymentDate": _s("Payment date (YYYY-MM-DD)"),
-                "amount": _n("Amount paid (in invoice currency)"),
-                "paymentTypeId": _i("Payment type ID. 1 = bank transfer (default), 2 = cash."),
-            },
-            required=["invoice_id", "paymentDate", "amount"],
-        ),
-    ),
+    {"name": "tripletex_register_payment",
+     "description": "Register a payment against an invoice.",
+     "input_schema": {"type": "object", "properties": {
+         "invoice_id": {"type": "integer", "description": "Invoice ID"},
+         "paymentDate": {"type": "string", "description": "Payment date (YYYY-MM-DD)"},
+         "amount": {"type": "number", "description": "Amount paid (in invoice currency)"},
+         "paymentTypeId": {"type": "integer", "description": "Payment type ID. 1 = bank transfer (default)."},
+     }, "required": ["invoice_id", "paymentDate", "amount"]}},
 
     # ── Travel Expenses ───────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_travel_expenses",
-        description="List travel expense reports.",
-        parameters=_obj({
-            "fields": _s("Fields to return, e.g. 'id,description,employee,travelFromDate'"),
-            "count": _i("Max results"),
-        }),
-    ),
+    {"name": "tripletex_list_travel_expenses",
+     "description": "List travel expense reports.",
+     "input_schema": {"type": "object", "properties": {
+         "fields": {"type": "string", "description": "Fields to return"},
+         "count": {"type": "integer", "description": "Max results"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_travel_expense",
-        description=(
-            "Create a travel expense report container. "
-            "IMPORTANT: Only 'employee_id' is accepted on creation. "
-            "Do NOT send description, travelFromDate, travelToDate, or purpose — "
-            "those fields don't exist on POST (they are read-only / set via sub-resources). "
-            "After creating the report, use tripletex_api_call to add details: "
-            "POST /travelExpense/{id}/perDiemCompensation for per-diem with dates, "
-            "POST /travelExpense/{id}/cost for individual costs."
-        ),
-        parameters=_obj(
-            {
-                "employee_id": _i("Employee ID who travelled"),
-            },
-            required=["employee_id"],
-        ),
-    ),
+    {"name": "tripletex_create_travel_expense",
+     "description": "Create a travel expense report container. Only employee_id is accepted on creation.",
+     "input_schema": {"type": "object", "properties": {
+         "employee_id": {"type": "integer", "description": "Employee ID who travelled"},
+     }, "required": ["employee_id"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_delete_travel_expense",
-        description="Delete a travel expense report by ID.",
-        parameters=_obj({"id": _i("Travel expense ID to delete")}, required=["id"]),
-    ),
+    {"name": "tripletex_delete_travel_expense",
+     "description": "Delete a travel expense report by ID.",
+     "input_schema": {"type": "object", "properties": {
+         "id": {"type": "integer", "description": "Travel expense ID to delete"},
+     }, "required": ["id"]}},
 
     # ── Projects ──────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_projects",
-        description="List projects.",
-        parameters=_obj({
-            "name": _s("Filter by project name"),
-            "fields": _s("Fields to return"),
-        }),
-    ),
+    {"name": "tripletex_list_projects",
+     "description": "List projects.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Filter by project name"},
+         "fields": {"type": "string", "description": "Fields to return"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_project",
-        description="Create a new project, optionally linked to a customer.",
-        parameters=_obj(
-            {
-                "name": _s("Project name"),
-                "number": _s("Project number (optional)"),
-                "customer_id": _i("Customer ID to link — optional"),
-                "startDate": _s("Start date (YYYY-MM-DD)"),
-                "endDate": _s("End date (YYYY-MM-DD) — optional"),
-                "description": _s("Project description — optional"),
-                "projectManagerId": _i("Employee ID of project manager — optional"),
-            },
-            required=["name", "startDate"],
-        ),
-    ),
+    {"name": "tripletex_create_project",
+     "description": "Create a new project, optionally linked to a customer.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Project name"},
+         "number": {"type": "string", "description": "Project number (optional)"},
+         "customer_id": {"type": "integer", "description": "Customer ID to link — optional"},
+         "startDate": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
+         "endDate": {"type": "string", "description": "End date (YYYY-MM-DD) — optional"},
+         "description": {"type": "string", "description": "Project description — optional"},
+         "projectManagerId": {"type": "integer", "description": "Employee ID of project manager — optional"},
+     }, "required": ["name", "startDate"]}},
 
     # ── Activities ────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_create_activity",
-        description=(
-            "Create an activity (work type used for time tracking on projects). "
-            "Use this when the task asks to create activities, tasks, or work types. "
-            "The activityType is set automatically to 1 (GENERAL_HOURS) — do not pass it. "
-            "After creating, link the activity to the project using tripletex_link_activity_to_project."
-        ),
-        parameters=_obj(
-            {
-                "name": _s("Activity name"),
-                "description": _s("Description — optional"),
-                "isGeneral": _b("Whether this is a general/global activity (default false)"),
-                "isChargeable": _b("Whether hours on this activity are chargeable to the customer"),
-            },
-            required=["name"],
-        ),
-    ),
+    {"name": "tripletex_create_activity",
+     "description": "Create an activity (work type for time tracking). Link to project after with tripletex_link_activity_to_project.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Activity name"},
+         "description": {"type": "string", "description": "Description — optional"},
+         "isGeneral": {"type": "boolean", "description": "Whether this is a general/global activity"},
+         "isChargeable": {"type": "boolean", "description": "Whether hours are chargeable to the customer"},
+     }, "required": ["name"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_list_activities",
-        description=(
-            "List activities. Call this BEFORE creating an activity to check if one with that name "
-            "already exists (Tripletex has default global activities for common names like 'Utvikling', "
-            "'Design', 'Administrasjon'). If the activity exists and isChargeable=true, use its ID "
-            "directly. If it exists but isChargeable=false, create a NEW activity with a DIFFERENT name. "
-            "NEVER try to update/PUT an existing activity — it returns 500."
-        ),
-        parameters=_obj({
-            "name": _s("Filter by activity name (partial match)"),
-            "fields": _s("Fields to return, e.g. 'id,name,isChargeable,isGeneral'"),
-            "count": _i("Max results"),
-        }),
-    ),
+    {"name": "tripletex_list_activities",
+     "description": "List activities. Check BEFORE creating — Tripletex has default activities. NEVER PUT/update an existing activity (returns 500).",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Filter by name (partial match)"},
+         "fields": {"type": "string", "description": "Fields to return"},
+         "count": {"type": "integer", "description": "Max results"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_link_activity_to_project",
-        description=(
-            "Link an activity to a project so it can be used for time tracking and billing. "
-            "Call AFTER creating both the project and the activity. "
-            "NEVER use PUT /project/{id} or PUT /project/{id}/activity — those do not work. "
-            "The correct endpoint is POST /project/projectActivity."
-        ),
-        parameters=_obj(
-            {
-                "project_id": _i("Project ID"),
-                "activity_id": _i("Activity ID to link to the project"),
-            },
-            required=["project_id", "activity_id"],
-        ),
-    ),
+    {"name": "tripletex_link_activity_to_project",
+     "description": "Link an activity to a project. Uses POST /project/projectActivity.",
+     "input_schema": {"type": "object", "properties": {
+         "project_id": {"type": "integer", "description": "Project ID"},
+         "activity_id": {"type": "integer", "description": "Activity ID"},
+     }, "required": ["project_id", "activity_id"]}},
 
     # ── Departments ───────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_departments",
-        description="List departments.",
-        parameters=_obj({"fields": _s("Fields to return")}),
-    ),
+    {"name": "tripletex_list_departments",
+     "description": "List departments.",
+     "input_schema": {"type": "object", "properties": {
+         "fields": {"type": "string", "description": "Fields to return"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_department",
-        description="Create a new department.",
-        parameters=_obj(
-            {
-                "name": _s("Department name"),
-                "departmentNumber": _s("Department number — optional"),
-                "departmentManagerId": _i("Employee ID of department manager — optional"),
-            },
-            required=["name"],
-        ),
-    ),
+    {"name": "tripletex_create_department",
+     "description": "Create a new department.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Department name"},
+         "departmentNumber": {"type": "string", "description": "Department number — optional"},
+         "departmentManagerId": {"type": "integer", "description": "Manager employee ID — optional"},
+     }, "required": ["name"]}},
 
-    # ── Ledger (Tier 3) ───────────────────────────────────────────────────────
+    # ── Ledger ────────────────────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_list_accounts",
-        description=(
-            "List chart-of-accounts entries (ledger accounts). "
-            "All accounts are PRE-POPULATED — never create accounts. "
-            "Supports PREFIX search: number=65 returns all 65xx accounts, "
-            "number=12 returns all 12xx. Omit number to get ALL accounts. "
-            "Call ONCE with the right prefix — do not repeat searches."
-        ),
-        parameters=_obj({
-            "number": _s("Account number prefix (e.g. '65' for all 65xx accounts). Omit to get all accounts."),
-            "fields": _s("Fields to return, e.g. 'id,number,name'"),
-        }),
-    ),
+    {"name": "tripletex_list_accounts",
+     "description": "List chart-of-accounts entries. All accounts are PRE-POPULATED — never create accounts. Supports PREFIX search: number=65 returns all 65xx accounts.",
+     "input_schema": {"type": "object", "properties": {
+         "number": {"type": "string", "description": "Account number prefix (e.g. '65' for all 65xx). Omit for all."},
+         "fields": {"type": "string", "description": "Fields to return, e.g. 'id,number,name'"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_list_vouchers",
-        description="List vouchers (bilag). Default returns up to 100 vouchers.",
-        parameters=_obj({
-            "dateFrom": _s("From date (YYYY-MM-DD)"),
-            "dateTo": _s("To date (YYYY-MM-DD)"),
-            "fields": _s("Fields to return"),
-            "count": _i("Max results (default 100)"),
-        }),
-    ),
+    {"name": "tripletex_list_vouchers",
+     "description": "List vouchers (bilag). Use flat field names only (e.g. 'id,date,description,postings').",
+     "input_schema": {"type": "object", "properties": {
+         "dateFrom": {"type": "string", "description": "From date (YYYY-MM-DD)"},
+         "dateTo": {"type": "string", "description": "To date (YYYY-MM-DD)"},
+         "fields": {"type": "string", "description": "Fields to return (flat only, no nested syntax)"},
+         "count": {"type": "integer", "description": "Max results (default 100)"},
+     }}},
 
-    types.FunctionDeclaration(
-        name="tripletex_create_voucher",
-        description=(
-            "Create a manual voucher (bilag) with debit/credit postings. "
-            "ALWAYS use this tool for vouchers — NEVER use tripletex_api_call for /ledger/voucher "
-            "(api_call does not set row numbers, causing row-0 422 errors). "
-            "FORBIDDEN accounts (system-protected — will cause 422 guiRow-0 error): "
-            "bank/cash (1920, 1900), VAT (2700-2709). "
-            "Account 1500 (AR): allowed but REQUIRES customer_id on the posting. "
-            "Account 2400 (AP): allowed but REQUIRES supplier_id on the posting. "
-            "For expenses/receipts: Debit expense account (6xxx) + specify vatType_id on that line; "
-            "Credit accounts payable (2910 leverandørgjeld) or other liability (2990). "
-            "For employee expenses (reise/expense): include employee_id on the posting. "
-            "For depreciation: Debit depreciation expense (6010/6020 etc.), "
-            "Credit accumulated depreciation (12x9 — search with tripletex_list_accounts number=12). "
-            "NEVER manually post to VAT accounts — set vatType_id on the expense line instead."
-        ),
-        parameters=_obj(
-            {
-                "date": _s("Voucher date (YYYY-MM-DD)"),
-                "description": _s("Description"),
-                "postings": _arr(
-                    _obj({
-                        "account_id": _i("Ledger account ID (from tripletex_list_accounts)"),
-                        "amount": _n("Amount (positive = debit, negative = credit)"),
-                        "description": _s("Posting description"),
-                        "vatType_id": _i(
-                            "VAT type ID — set this on expense lines instead of posting manually "
-                            "to VAT accounts. Find IDs via tripletex_api_call GET /ledger/vatType."
-                        ),
-                        "department_id": _i("Department ID to assign this posting to"),
-                        "customer_id": _i("Customer ID — REQUIRED when posting to AR account 1500 (kundefordringer)"),
-                        "supplier_id": _i("Supplier ID — REQUIRED when posting to AP account 2400 (leverandørgjeld)"),
-                        "employee_id": _i("Employee ID — required for employee-related expense postings (reise, personal expenses)"),
-                    }),
-                    desc="Debit/credit postings. Must balance (sum to zero).",
-                ),
-            },
-            required=["date", "postings"],
-        ),
-    ),
+    {"name": "tripletex_create_voucher",
+     "description": (
+         "Create a manual voucher with debit/credit postings. ALWAYS use this for vouchers. "
+         "FORBIDDEN accounts: 1920, 1900, 2700-2709. "
+         "Account 1500 (AR): REQUIRES customer_id. Account 2400 (AP): REQUIRES supplier_id."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "date": {"type": "string", "description": "Voucher date (YYYY-MM-DD)"},
+         "description": {"type": "string", "description": "Description"},
+         "postings": {"type": "array", "description": "Debit/credit postings. Must balance (sum to zero).", "items": {
+             "type": "object", "properties": {
+                 "account_id": {"type": "integer", "description": "Ledger account ID"},
+                 "amount": {"type": "number", "description": "Amount (positive=debit, negative=credit)"},
+                 "description": {"type": "string", "description": "Posting description"},
+                 "vatType_id": {"type": "integer", "description": "VAT type ID — set on expense lines"},
+                 "department_id": {"type": "integer", "description": "Department ID"},
+                 "customer_id": {"type": "integer", "description": "Customer ID — REQUIRED for account 1500"},
+                 "supplier_id": {"type": "integer", "description": "Supplier ID — REQUIRED for account 2400"},
+                 "employee_id": {"type": "integer", "description": "Employee ID — for employee expense postings"},
+             }}},
+     }, "required": ["date", "postings"]}},
 
-    types.FunctionDeclaration(
-        name="tripletex_list_postings",
-        description="List ledger postings.",
-        parameters=_obj({
-            "dateFrom": _s("From date (YYYY-MM-DD)"),
-            "dateTo": _s("To date (YYYY-MM-DD)"),
-            "fields": _s("Fields to return"),
-        }),
-    ),
+    {"name": "tripletex_list_postings",
+     "description": "List ledger postings.",
+     "input_schema": {"type": "object", "properties": {
+         "dateFrom": {"type": "string", "description": "From date (YYYY-MM-DD)"},
+         "dateTo": {"type": "string", "description": "To date (YYYY-MM-DD)"},
+         "fields": {"type": "string", "description": "Fields to return"},
+     }}},
 
     # ── Generic escape hatch ──────────────────────────────────────────────────
 
-    types.FunctionDeclaration(
-        name="tripletex_api_call",
-        description=(
-            "Make a custom call to ANY Tripletex v2 endpoint. "
-            "Use this for operations not covered by the other tools, such as: "
-            "granting entitlements (POST /employee/entitlement with employee, entitlement, customer:{id:0}), "
-            "enabling modules (PUT /company/{id}/settings), "
-            "timesheet entries (POST /timesheet/entry), "
-            "salary transactions (POST /salary/transaction), "
-            "action endpoints like /invoice/{id}/:remind. "
-            "IMPORTANT: Do NOT use this for payment registration — "
-            "use tripletex_register_payment instead."
-        ),
-        parameters=_obj(
-            {
-                "method": _s("HTTP method", enum=["GET", "POST", "PUT", "DELETE"]),
-                "path": _s("API path starting with /, e.g. /employee/42/loggedInUser"),
-                "params": types.Schema(
-                    type=_O,
-                    description="Query string parameters as key-value pairs",
-                ),
-                "body": types.Schema(
-                    type=_O,
-                    description="Request body for POST or PUT",
-                ),
-            },
-            required=["method", "path"],
-        ),
-    ),
+    {"name": "tripletex_api_call",
+     "description": (
+         "Make a custom call to ANY Tripletex v2 endpoint. "
+         "Use for: entitlements, salary transactions, timesheet entries, action endpoints like /:remind. "
+         "Do NOT use for payment registration — use tripletex_register_payment."
+     ),
+     "input_schema": {"type": "object", "properties": {
+         "method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE"], "description": "HTTP method"},
+         "path": {"type": "string", "description": "API path starting with /, e.g. /employee/entitlement"},
+         "params": {"type": "object", "description": "Query string parameters"},
+         "body": {"type": "object", "description": "Request body for POST or PUT"},
+     }, "required": ["method", "path"]}},
 ]
-
-TOOLS = types.Tool(function_declarations=_DECLARATIONS)
 
 
 # ── Auto-fix helpers ──────────────────────────────────────────────────────────
@@ -797,6 +552,39 @@ def _auto_create_project_manager(client: TripletexClient) -> int | None:
         return None
 
 
+def _auto_create_division(client: TripletexClient) -> int | None:
+    """Create a division with all required fields. Returns division ID or None."""
+    from datetime import date as _date
+    try:
+        # Find a valid municipality
+        municipality_id = None
+        try:
+            munis = client.get("/municipality", params={"fields": "id,name", "count": 1})
+            muni_values = (munis or {}).get("values", [])
+            if muni_values:
+                municipality_id = muni_values[0]["id"]
+        except TripletexError:
+            pass
+
+        if not municipality_id:
+            municipality_id = 301  # Fallback: Oslo
+
+        today = _date.today().isoformat()
+        div_resp = client.post("/division", {
+            "name": "Hovedkontor",
+            "organizationNumber": "999999999",
+            "startDate": today,
+            "municipalityDate": today,
+            "municipality": {"id": municipality_id},
+        })
+        div_id = div_resp["value"]["id"]
+        logger.info(f"Auto-created division 'Hovedkontor' (ID={div_id})")
+        return div_id
+    except TripletexError as e:
+        logger.warning(f"Failed to auto-create division: {e}")
+        return None
+
+
 def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
     """Fix salary division error by linking the employee's employment to a division."""
     try:
@@ -816,12 +604,9 @@ def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
             div_values = []
 
         if not div_values:
-            # Try to create a division
-            try:
-                div_resp = client.post("/division", {"name": "Hovedkontor", "organizationNumber": ""})
-                div_id = div_resp["value"]["id"]
-                logger.info(f"Auto-created division 'Hovedkontor' (ID={div_id})")
-            except TripletexError:
+            # Try to create a division with all required fields
+            div_id = _auto_create_division(client)
+            if not div_id:
                 logger.warning("No divisions found and cannot create one — salary division fix failed")
                 return False
         else:
@@ -855,12 +640,13 @@ def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
 def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
     """Fix invoice 422 'bankkontonummer' by setting up company bank account."""
     if "bank_account" in client._auto_fix_attempted:
-        # Already tried once — raise STOP to prevent infinite retries
         raise TripletexError(
             422,
-            "BLOCKED: Invoice creation requires a company bank account, but setup already "
-            "failed. Do NOT retry invoice creation — it will always fail. "
-            "Complete any other parts of the task instead.",
+            "STOP: Invoice creation PERMANENTLY blocked — company has no bank account and "
+            "it CANNOT be added (proxy blocks PUT /company). Do NOT retry invoice creation. "
+            "Do NOT try GET /company, /whoAmI, /employee/loggedInUser, or any other approach "
+            "to find/fix the company — NONE will work. Instead: complete ALL other parts of "
+            "the task (create customer, product, order, project, etc.) and STOP.",
         )
     client._auto_fix_attempted.add("bank_account")
     logger.info("Invoice blocked by missing bank account — attempting auto-setup")
@@ -887,12 +673,13 @@ def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
         })
     except TripletexError as bank_exc:
         logger.warning(f"Bank account auto-setup failed: {bank_exc}")
-        # Return a clear STOP message so the model doesn't waste iterations retrying
         raise TripletexError(
             422,
-            "BLOCKED: Invoice creation requires a company bank account, but bank account "
-            "setup is blocked by the proxy (405). Do NOT retry invoice creation — it will "
-            "always fail. Complete any other parts of the task instead.",
+            "STOP: Invoice creation PERMANENTLY blocked — company has no bank account and "
+            "it CANNOT be added (proxy blocks PUT /company). Do NOT retry invoice creation. "
+            "Do NOT try GET /company, /whoAmI, /employee/loggedInUser, or any other approach "
+            "to find/fix the company — NONE will work. Instead: complete ALL other parts of "
+            "the task (create customer, product, order, project, etc.) and STOP.",
         )
 
 
@@ -939,15 +726,22 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Employees ─────────────────────────────────────────────────────────
 
         case "tripletex_list_employees":
+            fields = args.get("fields", "id,firstName,lastName,email,phoneNumberMobile")
+            # Strip invalid EmployeeDTO fields
+            bad_emp_fields = {"company", "salary", "annualSalary", "wage"}
+            fields = ",".join(f.strip() for f in fields.split(",") if f.strip() not in bad_emp_fields)
             return client.get("/employee", params={
                 "name": args.get("name"),
-                "fields": args.get("fields", "id,firstName,lastName,email,phoneNumberMobile"),
+                "fields": fields,
                 "count": 10,
             })
 
         case "tripletex_get_employee":
+            fields = args.get("fields", "id,firstName,lastName,email,phoneNumberMobile,version")
+            bad_emp_fields = {"company", "salary", "annualSalary", "wage"}
+            fields = ",".join(f.strip() for f in fields.split(",") if f.strip() not in bad_emp_fields)
             return client.get(f"/employee/{args['id']}", params={
-                "fields": args.get("fields", "id,firstName,lastName,email,phoneNumberMobile,version"),
+                "fields": fields,
             })
 
         case "tripletex_create_employee":
@@ -1082,9 +876,12 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         # ── Customers ─────────────────────────────────────────────────────────
 
         case "tripletex_list_customers":
+            fields = args.get("fields", "id,name,email,phoneNumber")
+            bad_cust_fields = {"company"}
+            fields = ",".join(f.strip() for f in fields.split(",") if f.strip() not in bad_cust_fields)
             return client.get("/customer", params={
                 "name": args.get("name"),
-                "fields": args.get("fields", "id,name,email,phoneNumber"),
+                "fields": fields,
                 "count": 10,
             })
 
@@ -1208,7 +1005,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "invoiceDateTo": args.get("invoiceDateTo", "2030-12-31"),
                 "customerId": args.get("customerId"),
                 "fields": fields,
-                "count": args.get("count", 10),
+                "count": args.get("count", 100),
             }))
 
         case "tripletex_send_invoice":
@@ -1393,6 +1190,10 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
 
         case "tripletex_list_vouchers":
             fields = args.get("fields", "id,date,description,postings")
+            # If model used nested brace syntax like "postings{account{id",
+            # replace with safe flat defaults (nested syntax causes 400)
+            if "{" in fields:
+                fields = "id,date,description,postings"
             # Strip invalid VoucherDTO fields that cause 400
             bad_voucher_fields = {"amount", "accountId", "account"}
             parts = [f.strip() for f in fields.split(",")]
@@ -1400,7 +1201,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             seen = set()
             clean_parts = []
             for f in parts:
-                base = f.split("(")[0].strip()  # handle nested like postings(...)
+                base = f.split("(")[0].strip()
                 if base not in bad_voucher_fields and base not in seen:
                     seen.add(base)
                     clean_parts.append(f)
@@ -1455,6 +1256,28 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             if path.rstrip("/") in ("/company/division", "/company/divisions"):
                 path = "/division"
 
+            # Block endpoints that don't exist or are proxy-blocked — prevent wasted iterations
+            blocked_paths = {
+                "/company": "GET /company is blocked by the proxy (405). Do NOT retry. "
+                    "You do NOT need the company ID for any task.",
+                "/whoAmI": "/whoAmI does not exist (404). Do NOT retry.",
+                "/employee/loggedInUser": "/employee/loggedInUser does not exist. Do NOT retry.",
+                "/occupationCode": "/occupationCode does not exist. Use /employee/employment/occupationCode instead.",
+            }
+            clean_path = path.rstrip("/")
+            if clean_path in blocked_paths:
+                raise TripletexError(400, f"BLOCKED: {blocked_paths[clean_path]}")
+
+            # Strip invalid fields from GET params
+            if method == "GET" and params.get("fields"):
+                fields_str = params["fields"]
+                # Strip 'company' field from any DTO (doesn't exist on Employee, Customer, etc.)
+                bad_get_fields = {"company", "salary", "annualSalary", "wage"}
+                params["fields"] = ",".join(
+                    f.strip() for f in fields_str.split(",")
+                    if f.strip() not in bad_get_fields
+                )
+
             # BLOCK POST /ledger/account — accounts are pre-populated in the
             # chart of accounts and must NEVER be created via the API.
             # NOTE: exact match to avoid blocking /ledger/accountingDimensionName etc.
@@ -1508,13 +1331,11 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                             body["division"] = {"id": div_values[0]["id"]}
                             logger.info(f"Auto-linked employment to division {div_values[0]['id']}")
                         else:
-                            # No divisions exist — create one
-                            try:
-                                div_resp = client.post("/division", {"name": "Hovedkontor", "organizationNumber": ""})
-                                div_id = div_resp["value"]["id"]
+                            # No divisions exist — create one with required fields
+                            div_id = _auto_create_division(client)
+                            if div_id:
                                 body["division"] = {"id": div_id}
-                                logger.info(f"Auto-created division 'Hovedkontor' (ID={div_id}) for employment")
-                            except TripletexError:
+                            else:
                                 logger.warning("Could not create division for employment — salary may fail later")
                     except TripletexError:
                         logger.warning("Could not find division for employment — salary may fail later")

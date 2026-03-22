@@ -16,18 +16,20 @@ if _env_file.exists():
     except ImportError:
         pass  # dotenv not installed — env vars must be set manually
 
-# ── Gemini / Vertex AI ────────────────────────────────────────────────────────
+# ── Gemini / Vertex AI (used for file extraction with Flash) ─────────────────
 USE_VERTEX_AI: bool = os.environ.get("USE_VERTEX_AI", "false").lower() == "true"
 GOOGLE_CLOUD_PROJECT: str = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
 VERTEX_AI_LOCATION: str = os.environ.get("VERTEX_AI_LOCATION", "us-central1")
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
-# Model to use for the main reasoning + tool-calling loop
-GEMINI_MODEL: str = os.environ.get("GEMINI_MODEL", "gemini-2.5-pro")
 # Lighter model for file extraction only
 GEMINI_FLASH_MODEL: str = os.environ.get("GEMINI_FLASH_MODEL", "gemini-2.5-flash")
 
-# ── Agent behaviour ───────────────────────────────────────────────────────────
+# ── Claude (main agent reasoning) ────────────────────────────────────────────
+CLAUDE_MODEL: str = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6-20250514")
+CLAUDE_REGION: str = os.environ.get("CLAUDE_REGION", "europe-west1")
+
+# ── Agent behaviour ──────────────────────────────────────────────────────────
 # Hard cap on tool-call iterations per solve request
 MAX_AGENT_ITERATIONS: int = int(os.environ.get("MAX_AGENT_ITERATIONS", "25"))
 # Stop the agent loop this many seconds before the 300 s hard deadline

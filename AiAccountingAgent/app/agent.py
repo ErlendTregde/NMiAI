@@ -1,14 +1,14 @@
 """
-Gemini agentic loop.
+Claude agentic loop (via Vertex AI).
 
 Flow per solve request:
-  1. Build Gemini client (Vertex AI in prod, API-key locally)
-  2. Process file attachments → extract text
+  1. Build Claude client (AnthropicVertex) + Gemini client (file extraction only)
+  2. Process file attachments → extract text (Gemini Flash)
   3. Build initial user message (task prompt + file contents)
   4. Enter the tool-calling loop:
-       a. Call Gemini with all Tripletex tools available
-       b. If model returns function calls → execute each → feed results back
-       c. If model returns no function calls → done
+       a. Call Claude with all Tripletex tools available
+       b. If model returns tool_use blocks → execute each → feed results back
+       c. If model returns end_turn → done
   5. Return (caller always returns {"status": "completed"})
 
 Design:
@@ -19,17 +19,18 @@ Design:
   • All validation errors from Tripletex are fed back to the model as tool
     results so it can self-correct in one additional call.
 """
+import json
 import logging
 import time
 from datetime import date
 
+from anthropic import AnthropicVertex
 from google import genai
-from google.genai import types
 
 from . import config
 from .files import process_files
 from .schemas import SolveFile
-from .tools import TOOLS, execute_tool
+from .tools import CLAUDE_TOOLS, execute_tool
 from .tripletex.client import TripletexClient
 
 logger = logging.getLogger(__name__)
@@ -96,16 +97,21 @@ if the auto-fix also fails, in which case follow the error message guidance:
 Chain: customer → product → order → invoice → [send] → [payment]
 • Order: customer_id + orderDate required. deliveryDate defaults to orderDate. \
   Price field in orderLines: unitPriceExcludingVat.
-• Invoice: order_id + invoiceDate required. invoiceDueDate: if not specified, use invoiceDate + 30 days.
+• Invoice: order_id + invoiceDate required. invoiceDueDate: if not specified, use invoiceDate + 30 days. \
+  If invoice creation fails with "bankkontonummer" error, this is PERMANENT — auto-fix is attempted \
+  but usually fails. Do NOT try to fix it manually (GET /company, /whoAmI, etc. all fail). \
+  Just complete all other parts of the task and stop.
 • Send: tripletex_send_invoice (separate from payment — only if task says "send").
 • Payment: tripletex_register_payment(invoice_id, paymentDate, amount, paymentTypeId=1). \
   Payment 404 is auto-fixed. Do NOT try to set up bank accounts for payment errors.
 • Credit note: tripletex_create_credit_note(invoice_id, date). Never DELETE invoices.
 • FINDING EXISTING INVOICES: Sandboxes MAY have pre-existing invoices. \
-  Search with tripletex_list_invoices using WIDE date range (2020-01-01 to 2030-12-31). \
-  If the task references an invoice number (e.g. "202400003"), search ALL years. \
-  The invoiceNumber field is included in list results — match by invoiceNumber, NOT by ID. \
-  If no matching invoice found after checking all years, the invoice truly doesn't exist.
+  Search with tripletex_list_invoices using WIDE date range (2020-01-01 to 2030-12-31) and count=100. \
+  Invoice numbers in Tripletex are SIMPLE INTEGERS (1, 2, 3) — NOT formatted strings like "202400003". \
+  If the task says "faktura 202400003" or "invoice #202600001", the actual Tripletex invoiceNumber \
+  is likely just the last digits (e.g. 3 or 1). Search ALL invoices with wide range and examine each. \
+  If only 1 invoice exists in the sandbox, that is probably the one the task refers to. \
+  Match by customer name or amount if the number doesn't match exactly.
 • DUNNING (purring/inkasso/Mahnung): \
   1. Find the existing overdue invoice (DO NOT create a new fake one). \
   2. Send reminder: tripletex_api_call PUT /invoice/{{id}}/:remind. \
@@ -243,10 +249,14 @@ Chain: customer → product → order → invoice → [send] → [payment]
   Use tripletex_list_accounts to find them.
 • DIVISION: Use /division NOT /company/division or /company/divisions (those cause 422).
 • OCCUPATION CODE: Use /employee/employment/occupationCode NOT /occupationCode (causes 404).
+• COMPANY: GET /company and PUT /company are BLOCKED by proxy (405). \
+  Do NOT try to access company info — you do NOT need it. \
+  Do NOT try /whoAmI (404), /employee/loggedInUser (422). \
+  The "company" field does NOT exist on EmployeeDTO or CustomerDTO.
 • NON-EXISTENT ENDPOINTS (cause 404/422 — NEVER use these): \
   /invoice/{{id}}/payment, /invoice/payment, /employee/{{id}}/loggedInUser, \
   /employee/employment/employmentDetails, /v2/ledger/account, /v2/currency, \
-  /company/division, /company/divisions, /occupationCode.
+  /company/division, /company/divisions, /occupationCode, /whoAmI, /company.
 • Listing: invoices require invoiceDateFrom + invoiceDateTo.
 • Invalid list fields: dueDate, isPaid, amountOutstanding (cause 400).
 • Ledger postings: do NOT request account.number (causes 400).
@@ -279,6 +289,7 @@ Chain: customer → product → order → invoice → [send] → [payment]
 
 
 def _build_gemini_client() -> genai.Client:
+    """Build Gemini client — used ONLY for file extraction (Flash model)."""
     if config.USE_VERTEX_AI:
         if not config.GOOGLE_CLOUD_PROJECT:
             raise ValueError("GOOGLE_CLOUD_PROJECT must be set when USE_VERTEX_AI=true")
@@ -294,6 +305,16 @@ def _build_gemini_client() -> genai.Client:
     return genai.Client(api_key=config.GEMINI_API_KEY)
 
 
+def _build_claude_client() -> AnthropicVertex:
+    """Build Claude client via Vertex AI for the main agent reasoning."""
+    if not config.GOOGLE_CLOUD_PROJECT:
+        raise ValueError("GOOGLE_CLOUD_PROJECT must be set for Claude on Vertex AI")
+    return AnthropicVertex(
+        project_id=config.GOOGLE_CLOUD_PROJECT,
+        region=config.CLAUDE_REGION,
+    )
+
+
 def run_agent(
     prompt: str,
     files: list[SolveFile],
@@ -306,9 +327,10 @@ def run_agent(
     """
     deadline = time.time() + config.TIME_BUDGET_SECONDS
     gemini_client = _build_gemini_client()
+    claude_client = _build_claude_client()
     tripletex_client = TripletexClient(base_url, session_token)
 
-    # Process attachments
+    # Process attachments (uses Gemini Flash for PDF/image extraction)
     file_text = process_files(files, gemini_client, config.GEMINI_FLASH_MODEL)
 
     # Build initial user message
@@ -316,27 +338,17 @@ def run_agent(
     if file_text:
         user_message = f"{prompt}\n\n---\nATTACHED FILES:\n{file_text}"
 
-    system_instruction = _SYSTEM_PROMPT.format(today=date.today().isoformat())
+    system_prompt = _SYSTEM_PROMPT.format(today=date.today().isoformat())
 
-    contents: list[types.Content] = [
-        types.Content(role="user", parts=[types.Part(text=user_message)])
+    # Claude messages list
+    messages: list[dict] = [
+        {"role": "user", "content": user_message},
     ]
-
-    gen_config = types.GenerateContentConfig(
-        system_instruction=system_instruction,
-        tools=[TOOLS],
-        tool_config=types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(mode="AUTO")
-        ),
-        # Disable AFC — we manage the tool-calling loop ourselves
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        temperature=0,  # Deterministic: reduces random errors and inconsistency
-    )
 
     logger.info(
         "Agent loop starting",
         extra={
-            "model": config.GEMINI_MODEL,
+            "model": config.CLAUDE_MODEL,
             "has_files": bool(files),
             "prompt_length": len(prompt),
         },
@@ -348,99 +360,78 @@ def run_agent(
             break
 
         try:
-            response = gemini_client.models.generate_content(
-                model=config.GEMINI_MODEL,
-                contents=contents,
-                config=gen_config,
+            response = claude_client.messages.create(
+                model=config.CLAUDE_MODEL,
+                max_tokens=8192,
+                system=system_prompt,
+                tools=CLAUDE_TOOLS,
+                messages=messages,
             )
         except Exception as exc:
-            logger.error(f"Gemini generate_content failed: {exc}", exc_info=True)
+            logger.error(f"Claude messages.create failed: {exc}", exc_info=True)
             break
 
-        if not response.candidates:
-            if iteration < 2:
-                logger.warning(f"Gemini returned no candidates on iteration {iteration} — retrying.")
-                time.sleep(1)
-                continue
-            logger.warning("Gemini returned no candidates — stopping loop.")
-            break
+        # Log text blocks from the response
+        for block in response.content:
+            if block.type == "text" and block.text:
+                logger.info(f"Model text: {block.text[:300]}")
 
-        model_content = response.candidates[0].content
-        if model_content is None:
-            # Retry up to 3 times — transient safety/content filters often clear
-            recovered = False
-            for retry_num in range(1, 4):
-                logger.warning(
-                    f"Gemini returned no content (attempt {retry_num}/3) — retrying."
+        # Check if there are any tool_use blocks
+        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+        if not tool_use_blocks:
+            if response.stop_reason == "end_turn":
+                logger.info(
+                    f"Agent finished after {iteration + 1} Claude call(s) — "
+                    f"model returned end_turn."
                 )
-                # Add a nudge message to help Gemini continue
-                nudge = types.Content(
-                    role="user",
-                    parts=[types.Part(text="Please continue with the accounting task.")]
-                )
-                try:
-                    response = gemini_client.models.generate_content(
-                        model=config.GEMINI_MODEL,
-                        contents=contents + [nudge],
-                        config=gen_config,
-                    )
-                    if response.candidates:
-                        model_content = response.candidates[0].content
-                    if model_content is not None:
-                        recovered = True
-                        break
-                except Exception as exc:
-                    logger.error(f"Gemini retry {retry_num} failed: {exc}")
-                time.sleep(0.5 * retry_num)  # Brief back-off
-            if not recovered:
-                logger.warning("Gemini returned no content after 3 retries — stopping.")
                 break
-
-        # Use SDK shortcut which handles thinking tokens and mixed parts correctly
-        function_calls = response.function_calls or []
-
-        # Log what the model said (text parts) — skip thought/reasoning parts
-        for part in (model_content.parts or []):
-            if hasattr(part, "text") and part.text and not getattr(part, "thought", False):
-                logger.info(f"Model text: {part.text[:300]}")
-
-        if not function_calls:
+            # No tool calls and not end_turn — nudge on early iterations
             if iteration < 2:
-                # Model returned text but no tools — nudge it to actually act
                 logger.warning(
                     f"No tool calls on iteration {iteration} — nudging model to use tools."
                 )
-                contents.append(model_content)
-                contents.append(types.Content(role="user", parts=[
-                    types.Part(text=(
-                        "You MUST use the available Tripletex API tools to complete this task. "
-                        "Do not just describe what to do — execute the necessary API calls NOW. "
-                        "Start with the first required tool call."
-                    ))
-                ]))
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "user", "content": (
+                    "You MUST use the available Tripletex API tools to complete this task. "
+                    "Do not just describe what to do — execute the necessary API calls NOW. "
+                    "Start with the first required tool call."
+                )})
                 continue
             logger.info(
-                f"Agent finished after {iteration + 1} Gemini call(s) — "
+                f"Agent finished after {iteration + 1} Claude call(s) — "
                 f"no tool calls in response."
             )
             break
 
-        # Add the model's response to conversation history
-        contents.append(model_content)
+        # Add assistant response to messages
+        messages.append({"role": "assistant", "content": response.content})
 
-        # Execute every function call and collect results
-        result_parts: list[types.Part] = []
-        for fc in function_calls:
+        # Execute every tool call and collect results
+        tool_results = []
+        for tool_block in tool_use_blocks:
             if time.time() > deadline:
                 logger.warning("Time budget hit while executing tool calls.")
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_block.id,
+                    "content": json.dumps({"success": False, "error": "Time budget exhausted"}),
+                })
                 break
-            result = execute_tool(tripletex_client, fc.name, dict(fc.args))
-            result_parts.append(
-                types.Part.from_function_response(name=fc.name, response=result)
+
+            result = execute_tool(
+                tripletex_client,
+                tool_block.name,
+                dict(tool_block.input),
             )
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tool_block.id,
+                "content": json.dumps(result, default=str),
+            })
 
         # Feed all tool results back in a single user turn
-        contents.append(types.Content(role="user", parts=result_parts))
+        messages.append({"role": "user", "content": tool_results})
 
     else:
         logger.warning(

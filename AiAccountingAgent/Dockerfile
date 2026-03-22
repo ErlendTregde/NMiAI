@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir \
     requests \
     pydantic \
     "google-genai>=1.0" \
+    "anthropic[vertex]>=0.49" \
     "pypdf>=4.0" \
     python-multipart \
     python-dotenv
