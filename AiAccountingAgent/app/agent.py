@@ -47,7 +47,8 @@ Understand fully regardless of language; reason in English.
 2. REUSE IDs — POST responses contain the new entity's ID. Never re-GET what you just created.
 3. MINIMAL CALLS — only make calls strictly necessary. No verification GETs after creation.
 4. NO TRIAL-AND-ERROR — validate before calling. On error: fix exactly once, do not guess.
-5. EMPTY SANDBOX — nothing exists. Create prerequisites in order (customer → product → order → invoice).
+5. SANDBOX — usually empty, but some tasks (dunning, credit notes, corrections) have PRE-EXISTING data. \
+   Check for existing entities FIRST before creating new ones. Create prerequisites only when needed.
 6. STOP WHEN DONE — do not make extra calls after the task is complete.
 
 ═══ AUTO-RESOLVED ERRORS (handled transparently — do NOT fix manually) ═══
@@ -61,6 +62,8 @@ if the auto-fix also fails, in which case follow the error message guidance:
 • Employment "dateOfBirth" 422 → placeholder date auto-set on employee before retry
 • Salary "virksomhet" 422 → employment auto-linked to company division and retried
 • Salary "count null" 422 → count:1.0 auto-added to specifications
+• Project "Prosjektleder" 422 → default project manager auto-created with entitlements
+• Entitlement "opprette nye prosjekter" 422 → prerequisite entitlement 45 auto-granted first
 
 ═══ EMPLOYEES ═══
 • department.id is REQUIRED. If task doesn't specify, create one first: \
@@ -117,7 +120,11 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • If 500 persists: the tool auto-retries with minimal body. Do NOT retry manually.
 
 ═══ PROJECTS ═══
-• tripletex_create_project requires name + startDate. Set projectManagerId if task mentions a manager.
+• tripletex_create_project requires name + startDate. \
+  projectManager is REQUIRED by Tripletex — if not specified, one is auto-created. \
+  If task mentions a specific project manager, set projectManagerId. \
+  For project manager entitlement: grant entitlement 45 (create project) THEN 10 (project manager). \
+  Both are auto-granted if the project manager auto-fix is triggered.
 • Fixed price: GET /project/{{id}}?fields=id,version → PUT /project/{{id}} with \
   {{"id":X,"version":Y,"isFixedPrice":true,"fixedprice":AMOUNT}} (fixedprice ALL LOWERCASE).
 
@@ -186,11 +193,16 @@ Chain: customer → product → order → invoice → [send] → [payment]
   If salary fails with "virksomhet" error, the division is auto-fixed and retried. \
   Do NOT try to manually fix division errors — let the auto-fix handle it.
 
-═══ MONTH-END CLOSING ═══
+═══ MONTH-END / YEAR-END CLOSING ═══
 • Salary accrual: if the task mentions an amount, use it. If no amount is given but the task \
   says "accrue salaries", use the salary from employment details or estimate based on context. \
   NEVER ask for more information — the task prompt contains everything you need.
 • Accrual reversal: Debit 1720 (prepaid) or Credit 2900 (accrued liabilities) depending on direction.
+• PREPAID EXPENSE REVERSAL (forskuddsbetalt kostnad / Rechnungsabgrenzung): \
+  Debit the MATCHING expense account (e.g. 6300 for prepaid rent, 6340 for prepaid utilities, \
+  6500 for prepaid supplies) / Credit 1700 (Forskuddsbetalt kostnad). \
+  Do NOT use 7790 "Annen kostnad" — use the specific expense account that matches the type. \
+  If unsure which expense: search tripletex_list_accounts for the relevant 2-digit prefix.
 • Always complete ALL steps described in the task — depreciation, accruals, reversals, etc.
 
 ═══ TRAVEL EXPENSES ═══
@@ -199,6 +211,16 @@ Chain: customer → product → order → invoice → [send] → [payment]
   If they fail: just create the travel expense container — do NOT retry sub-resources.
 • Delete: GET /travelExpense → DELETE /travelExpense/{{id}}.
 • List fields: only use "id,employee,status" — travelToDate/travelFromDate do NOT exist.
+
+═══ ACCOUNTING DIMENSIONS ═══
+• Create custom accounting dimensions via tripletex_api_call: \
+  Step 1: POST /ledger/accountingDimensionName with {{"name":"DimensionName"}} \
+  Step 2: POST /ledger/accountingDimensionValue with \
+  {{"accountingDimensionName":{{"id":DIM_ID}},"name":"ValueName"}} \
+  Step 3: To assign a dimension value to a voucher posting, include it in the posting body. \
+  Use GET /ledger/accountingDimensionName to list existing dimensions. \
+  Use GET /ledger/accountingDimensionValue to list values for a dimension.
+• Dimension examples: "Produktlinje", "Prosjekt", "Avdeling", "Region", "Koststed".
 
 ═══ BANK RECONCILIATION (Tier 3) ═══
 • Read CSV: identify date, description, amount, reference per row.
@@ -234,6 +256,8 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Depreciation: list_accounts(number=60) + list_accounts(number=10) + list_accounts(number=12) → pick expense + accum depr → create_voucher
 • Credit note: list_invoices (wide date range) → create_credit_note
 • Dunning: list_invoices → PUT /invoice/{{id}}/:remind → [optional: create fee invoice]
+• Accounting dimensions: POST /ledger/accountingDimensionName → POST /ledger/accountingDimensionValue
+• Year-end closing: list_accounts → create depreciation vouchers → reverse prepaid expenses → accrue liabilities
 • Travel expense: list_employees → create_travel_expense → add per_diem/costs
 • Delete travel: list_travel_expenses → delete_travel_expense
 """

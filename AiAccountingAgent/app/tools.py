@@ -218,6 +218,7 @@ _DECLARATIONS = [
                 "address": _s("Street address line"),
                 "postalCode": _s("Postal code"),
                 "city": _s("City"),
+                "description": _s("Customer description / notes — optional"),
             },
             required=["name"],
         ),
@@ -234,6 +235,7 @@ _DECLARATIONS = [
                 "email": _s("Email"),
                 "phoneNumber": _s("Phone number"),
                 "address": _s("Street address"),
+                "description": _s("Customer description / notes"),
             },
             required=["id", "version"],
         ),
@@ -746,6 +748,55 @@ def _auto_fix_product_exists(client: TripletexClient, args: dict) -> Any | None:
     return None
 
 
+def _auto_create_project_manager(client: TripletexClient) -> int | None:
+    """Create a default employee and grant project manager entitlements."""
+    try:
+        # Try to find an existing employee first
+        existing = client.get("/employee", params={"fields": "id,firstName", "count": 1})
+        existing_values = (existing or {}).get("values", [])
+        if existing_values:
+            emp_id = existing_values[0]["id"]
+        else:
+            # Create a minimal employee
+            dept_id = None
+            try:
+                dept_resp = client.post("/department", {"name": "Generell"})
+                dept_id = dept_resp["value"]["id"]
+            except TripletexError:
+                try:
+                    depts = client.get("/department", params={"fields": "id", "count": 1})
+                    dept_id = (depts or {}).get("values", [{}])[0].get("id")
+                except TripletexError:
+                    pass
+            emp_body: dict = {
+                "firstName": "Admin",
+                "lastName": "User",
+                "email": "admin@example.com",
+                "dateOfBirth": "1990-01-01",
+            }
+            if dept_id:
+                emp_body["department"] = {"id": dept_id}
+            emp = client.post("/employee", emp_body)
+            emp_id = emp["value"]["id"]
+
+        # Grant entitlements: 45 (create project) MUST come before 10 (project manager)
+        for ent_id in (45, 10):
+            try:
+                client.post("/employee/entitlement", {
+                    "employee": {"id": emp_id},
+                    "entitlementId": ent_id,
+                    "customer": {"id": 0},
+                })
+            except TripletexError:
+                pass  # May already be granted
+
+        logger.info(f"Auto-created project manager (employee {emp_id})")
+        return emp_id
+    except TripletexError as e:
+        logger.warning(f"Failed to auto-create project manager: {e}")
+        return None
+
+
 def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
     """Fix salary division error by linking the employee's employment to a division."""
     try:
@@ -759,7 +810,7 @@ def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
 
         # Find a valid division
         try:
-            divs = client.get("/company/divisions", params={"fields": "id,name", "count": 1})
+            divs = client.get("/division", params={"fields": "id,name", "count": 1})
             div_values = (divs or {}).get("values", [])
         except TripletexError:
             div_values = []
@@ -935,11 +986,30 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
 
         case "tripletex_grant_entitlement":
             # Note: field is "entitlementId" (integer), NOT "entitlement": {object}
-            return client.post("/employee/entitlement", {
+            ent_body = {
                 "employee": {"id": args["employee_id"]},
                 "entitlementId": args["entitlement_id"],
                 "customer": {"id": 0},  # 0 = current company (required by API)
-            })
+            }
+            try:
+                return client.post("/employee/entitlement", ent_body)
+            except TripletexError as exc:
+                # If project manager (10) needs "create project" (45) first, auto-grant it
+                if exc.status_code == 422 and any(
+                    "opprette nye prosjekter" in (vm.get("message") or "").lower()
+                    for vm in exc.validation_messages
+                ):
+                    logger.info("Auto-granting 'create project' entitlement (45) before project manager (10)")
+                    try:
+                        client.post("/employee/entitlement", {
+                            "employee": {"id": args["employee_id"]},
+                            "entitlementId": 45,
+                            "customer": {"id": 0},
+                        })
+                    except TripletexError:
+                        pass  # May already be granted
+                    return client.post("/employee/entitlement", ent_body)
+                raise
 
         case "tripletex_update_employee":
             body = _none_stripped({
@@ -1013,6 +1083,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "email": args.get("email"),
                 "organizationNumber": args.get("organizationNumber"),
                 "phoneNumber": args.get("phoneNumber"),
+                "description": args.get("description"),
                 "isCustomer": True,
             })
             if args.get("address") or args.get("postalCode") or args.get("city"):
@@ -1030,6 +1101,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "name": args.get("name"),
                 "email": args.get("email"),
                 "phoneNumber": args.get("phoneNumber"),
+                "description": args.get("description"),
             }))
 
         # ── Products ──────────────────────────────────────────────────────────
@@ -1192,7 +1264,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_project":
-            return client.post("/project", _none_stripped({
+            project_body = _none_stripped({
                 "name": args.get("name"),
                 "number": args.get("number"),
                 "customer": {"id": args["customer_id"]} if args.get("customer_id") else None,
@@ -1200,7 +1272,19 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 "endDate": args.get("endDate"),
                 "description": args.get("description"),
                 "projectManager": {"id": args["projectManagerId"]} if args.get("projectManagerId") else None,
-            }))
+            })
+            try:
+                return client.post("/project", project_body)
+            except TripletexError as exc:
+                if exc.status_code == 422 and any(
+                    "prosjektleder" in (vm.get("message") or vm.get("field") or "").lower()
+                    for vm in exc.validation_messages
+                ):
+                    pm_id = _auto_create_project_manager(client)
+                    if pm_id:
+                        project_body["projectManager"] = {"id": pm_id}
+                        return client.post("/project", project_body)
+                raise
 
         # ── Activities ────────────────────────────────────────────────────────
 
@@ -1368,7 +1452,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 if not body.get("division"):
                     body.pop("division", None)  # Remove empty/None division
                     try:
-                        divs = client.get("/company/divisions", params={"fields": "id,name", "count": 1})
+                        divs = client.get("/division", params={"fields": "id,name", "count": 1})
                         div_values = (divs or {}).get("values", [])
                         if div_values:
                             body["division"] = {"id": div_values[0]["id"]}
