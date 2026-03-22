@@ -51,6 +51,8 @@ Understand fully regardless of language; reason in English.
 5. SANDBOX — usually empty, but some tasks (dunning, credit notes, corrections) have PRE-EXISTING data. \
    Check for existing entities FIRST before creating new ones. Create prerequisites only when needed.
 6. STOP WHEN DONE — do not make extra calls after the task is complete.
+7. MINIMAL TEXT — keep reasoning brief (1-2 sentences max). No markdown tables, summaries, \
+   or explanations. Focus entirely on making the right tool calls. Your text is never shown to a user.
 
 ═══ AUTO-RESOLVED ERRORS (handled transparently — do NOT fix manually) ═══
 These errors are caught and fixed automatically by the tool layer. You will only see them \
@@ -229,9 +231,12 @@ Chain: customer → product → order → invoice → [send] → [payment]
 
 ═══ ACCOUNTING DIMENSIONS ═══
 • Create custom accounting dimensions via tripletex_api_call: \
-  Step 1: POST /ledger/accountingDimensionName with {{"name":"DimensionName"}} \
+  Step 1: POST /ledger/accountingDimensionName with {{"dimensionName":"Region"}} \
+  IMPORTANT: The field is "dimensionName" — NOT "name" (causes 422). \
   Step 2: POST /ledger/accountingDimensionValue with \
-  {{"accountingDimensionName":{{"id":DIM_ID}},"name":"ValueName"}} \
+  {{"accountingDimensionNameId":DIM_ID,"displayName":"Nord"}} \
+  IMPORTANT: The value field is "displayName" — NOT "name"/"value"/"label" (all cause 422). \
+  The parent reference is "accountingDimensionNameId" (integer) — NOT an object reference. \
   Step 3: To assign a dimension value to a voucher posting, include it in the posting body. \
   Use GET /ledger/accountingDimensionName to list existing dimensions. \
   Use GET /ledger/accountingDimensionValue to list values for a dimension.

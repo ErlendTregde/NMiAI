@@ -1290,6 +1290,45 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     "accounts, or use a 2-digit prefix like number=65 to find all 65xx accounts.",
                 )
 
+            # Intercept POST /ledger/accountingDimensionName — fix field names
+            # The DTO uses "dimensionName" NOT "name"
+            if method == "POST" and path.rstrip("/") == "/ledger/accountingDimensionName":
+                # Rename common wrong field names to the correct one
+                for wrong_field in ("name", "displayName", "label", "value"):
+                    if wrong_field in body and "dimensionName" not in body:
+                        body["dimensionName"] = body.pop(wrong_field)
+                        logger.info(f"Auto-renamed '{wrong_field}' → 'dimensionName' for accountingDimensionName")
+                        break
+
+            # Intercept POST /ledger/accountingDimensionValue — fix field names
+            # The DTO uses "displayName" for the value name, and
+            # "accountingDimensionNameId" (integer) for the parent reference
+            if method == "POST" and path.rstrip("/") == "/ledger/accountingDimensionValue":
+                # Rename wrong value name fields to "displayName"
+                for wrong_field in ("name", "value", "label", "dimensionValue",
+                                    "dimensionName", "code", "description"):
+                    if wrong_field in body and "displayName" not in body:
+                        body["displayName"] = body.pop(wrong_field)
+                        logger.info(f"Auto-renamed '{wrong_field}' → 'displayName' for accountingDimensionValue")
+                        break
+                # Fix parent reference: convert object ref or raw field to integer ID
+                # Model often sends {"accountingDimensionName": {"id": X}} but field doesn't exist
+                adn = body.pop("accountingDimensionName", None)
+                if adn is not None and "accountingDimensionNameId" not in body:
+                    if isinstance(adn, dict) and "id" in adn:
+                        body["accountingDimensionNameId"] = adn["id"]
+                    elif isinstance(adn, (int, float)):
+                        body["accountingDimensionNameId"] = int(adn)
+                    logger.info("Auto-fixed parent ref → accountingDimensionNameId")
+                # Also try other wrong parent field names
+                for wrong_parent in ("dimensionId", "dimensionNameId", "dimension"):
+                    val = body.pop(wrong_parent, None)
+                    if val is not None and "accountingDimensionNameId" not in body:
+                        if isinstance(val, dict) and "id" in val:
+                            body["accountingDimensionNameId"] = val["id"]
+                        elif isinstance(val, (int, float)):
+                            body["accountingDimensionNameId"] = int(val)
+
             # Intercept POST /ledger/voucher — auto-add row numbers to prevent
             # the "guiRow 0" 422 error that occurs when rows are missing.
             if method == "POST" and path.rstrip("/") == "/ledger/voucher":
