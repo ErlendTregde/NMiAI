@@ -1422,6 +1422,16 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 occ = body.get("occupationCode")
                 if occ is not None and not isinstance(occ, dict):
                     body.pop("occupationCode", None)  # Strip invalid type
+                # Fix remunerationType — map common wrong enum values to correct ones
+                rem = body.get("remunerationType")
+                if rem is not None:
+                    _rem_map = {
+                        "MONTHLY_PAY": "MONTHLY_WAGE", "MONTHLY": "MONTHLY_WAGE",
+                        "HOURLY_PAY": "HOURLY_WAGE", "HOURLY": "HOURLY_WAGE",
+                        "COMMISSION_PAY": "COMMISION_PERCENTAGE", "COMMISSION": "COMMISION_PERCENTAGE",
+                        "COMMISSION_PERCENTAGE": "COMMISION_PERCENTAGE",
+                    }
+                    body["remunerationType"] = _rem_map.get(rem, rem)
 
             # Intercept POST /travelExpense/cost — fix field names
             # Schema: travelExpense, vatType, currency, costCategory, paymentType,

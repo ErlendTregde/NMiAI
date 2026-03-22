@@ -51,8 +51,9 @@ Understand fully regardless of language; reason in English.
 5. SANDBOX — usually empty, but some tasks (dunning, credit notes, corrections) have PRE-EXISTING data. \
    Check for existing entities FIRST before creating new ones. Create prerequisites only when needed.
 6. STOP WHEN DONE — do not make extra calls after the task is complete.
-7. MINIMAL TEXT — keep reasoning brief (1-2 sentences max). No markdown tables, summaries, \
-   or explanations. Focus entirely on making the right tool calls. Your text is never shown to a user.
+7. MINIMAL TEXT — keep reasoning to 1-2 sentences max. NEVER output markdown tables, summaries, \
+   recaps, bullet lists, or explanations. Your text is NEVER shown to anyone. Every token wastes time. \
+   Just make the next tool call.
 
 ═══ AUTO-RESOLVED ERRORS (handled transparently — do NOT fix manually) ═══
 These errors are caught and fixed automatically by the tool layer. You will only see them \
@@ -87,7 +88,8 @@ if the auto-fix also fails, in which case follow the error message guidance:
   IMPORTANT: field is "percentageOfFullTimeEquivalent" NOT "positionPercentage" (which causes 422). \
   Do NOT include: positionCode, hoursPerDay, department, division, occupationCode \
   — these cause 422 on this endpoint. \
-  "remunerationType" IS valid (string enum: "MONTHLY_PAY", "HOURLY_PAY", "COMMISSION_PAY").
+  "remunerationType" IS valid (string enum: "MONTHLY_WAGE", "HOURLY_WAGE", "COMMISION_PERCENTAGE", "FEE", "PIECEWORK_WAGE"). \
+  Note: "COMMISION_PERCENTAGE" has ONE 's' (Tripletex typo). Default: "MONTHLY_WAGE".
 • To set annual salary: PUT /employee/employment/details/{{id}} with \
   {{"id":X,"version":Y,"percentageOfFullTimeEquivalent":Z,"annualSalary":AMOUNT}} — \
   annualSalary is ONLY valid on PUT update, NOT on initial POST.
@@ -212,15 +214,22 @@ Chain: customer → product → order → invoice → [send] → [payment]
   Do NOT try to manually fix division errors — let the auto-fix handle it.
 
 ═══ MONTH-END / YEAR-END CLOSING ═══
-• Salary accrual: if the task mentions an amount, use it. If no amount is given but the task \
-  says "accrue salaries", use the salary from employment details or estimate based on context. \
-  NEVER ask for more information — the task prompt contains everything you need.
-• Accrual reversal: Debit 1720 (prepaid) or Credit 2900 (accrued liabilities) depending on direction.
+• YEAR-END STRATEGY: Do ONE broad account search at the start — tripletex_list_accounts() with NO \
+  number filter to get ALL accounts. This avoids repeated searches. Use the full list to find \
+  every account you need for depreciation, prepaid reversal, tax provision, etc.
+• DEPRECIATION: Debit 6000 (Avskrivning) / Credit the accumulated depreciation account. \
+  Common accumulated depreciation accounts (search to confirm they exist): \
+  1019, 1029, 1039, 1049, 1059 (intangibles), 1209, 1219, 1229, 1239, 1249 (tangibles). \
+  If the exact account (e.g. 1209) doesn't exist, search for accounts with "avskrivning" in name.
+• TAX PROVISION (skattekostnad): Debit 8300 (Skattekostnad) / Credit 2500 (Betalbar skatt). \
+  If task specifies different accounts (e.g. 8700, 2920), search for those first. \
+  If they don't exist, use 8300/2500 as fallback.
 • PREPAID EXPENSE REVERSAL (forskuddsbetalt kostnad / Rechnungsabgrenzung): \
   Debit the MATCHING expense account (e.g. 6300 for prepaid rent, 6340 for prepaid utilities, \
   6500 for prepaid supplies) / Credit 1700 (Forskuddsbetalt kostnad). \
-  Do NOT use 7790 "Annen kostnad" — use the specific expense account that matches the type. \
-  If unsure which expense: search tripletex_list_accounts for the relevant 2-digit prefix.
+  Do NOT use 7790 "Annen kostnad" — use the specific expense account that matches the type.
+• Salary accrual: if the task mentions an amount, use it. Debit 5000 / Credit 2900 or 2910.
+• Accrual reversal: Debit 1720 (prepaid) or Credit 2900 (accrued liabilities) depending on direction.
 • Always complete ALL steps described in the task — depreciation, accruals, reversals, etc.
 
 ═══ TRAVEL EXPENSES ═══
