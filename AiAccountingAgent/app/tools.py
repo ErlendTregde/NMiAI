@@ -714,12 +714,12 @@ def execute_tool(client: TripletexClient, name: str, args: dict) -> dict:
     except TripletexError as exc:
         logger.warning(f"Tool {name} → Tripletex error: {exc.to_agent_message()}")
         msg = exc.to_agent_message()
-        # Make 403 errors unmistakable — model must stop immediately
-        if exc.status_code == 403:
+        # Make 401/403 errors unmistakable — model must stop immediately
+        if exc.status_code in (401, 403):
             msg = (
-                "FATAL: Session token expired or invalid (403 Forbidden). "
+                f"FATAL: Session token expired or invalid ({exc.status_code}). "
                 "ALL further API calls will fail. STOP IMMEDIATELY — do not make "
-                "any more tool calls. The task cannot be completed."
+                "any more tool calls. Do not retry. The task cannot be completed."
             )
         return {"success": False, "error": msg}
     except Exception as exc:

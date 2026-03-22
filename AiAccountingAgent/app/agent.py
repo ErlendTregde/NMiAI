@@ -315,7 +315,7 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Ledger postings fields: use "account" NOT "accountId" or "account.number" (both cause 400).
 • Product numbers: ONLY set if task explicitly provides one.
 • Order price via api_call: field is unitPriceExcludingVatCurrency.
-• On 403: session expired, STOP immediately.
+• On 401 or 403: session expired, STOP immediately. Do NOT retry — all calls will fail.
 
 ═══ COMMON PATTERNS ═══
 • Employee: create_department → create_employee → grant_entitlement (if role needed)
