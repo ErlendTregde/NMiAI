@@ -224,20 +224,23 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Always complete ALL steps described in the task — depreciation, accruals, reversals, etc.
 
 ═══ TRAVEL EXPENSES ═══
-• Create: tripletex_create_travel_expense(employee_id) — creates a DOMESTIC travel report. \
-  The tool auto-sets typeOfTravel=DOMESTIC (required for per diem compensation).
+• Create: tripletex_create_travel_expense(employee_id) — creates a reiseregning (travel report). \
+  The tool auto-sets travelDetails (required for per diem compensation). \
+  ALWAYS use this dedicated tool — do NOT use tripletex_api_call to create travel expenses.
 • Adding costs: tripletex_api_call POST /travelExpense/cost with body: \
-  {{"travelExpense":{{"id":TE_ID}},"currency":{{"code":"NOK"}},"costCategory":{{"id":CAT_ID}}, \
-  "paymentType":{{"id":PT_ID}},"amountNOKInclVAT":AMOUNT,"comments":"Description here"}} \
-  REQUIRED: paymentType (GET /travelExpense/paymentType to find IDs). \
-  REQUIRED: costCategory (GET /travelExpense/costCategory to find IDs — "Fly", "Taxi", etc.). \
-  Use "comments" for text/description (NOT "description"/"name"/"comment" — none of those exist).
+  {{"travelExpense":{{"id":TE_ID}},"costCategory":{{"id":CAT_ID}}, \
+  "paymentType":{{"id":PT_ID}},"amountCurrencyIncVat":AMOUNT,"amountNOKInclVAT":AMOUNT}} \
+  REQUIRED: paymentType, costCategory, amountCurrencyIncVat. \
+  GET /travelExpense/paymentType to find payment type IDs. \
+  GET /travelExpense/costCategory to find cost category IDs ("Fly", "Taxi", etc.). \
+  For NOK: do NOT send currency field (defaults to NOK). Sending currency:{{"code":"NOK"}} causes errors. \
+  Use "comments" for text/description (NOT "description"/"name"/"comment").
 • Per diem: POST /travelExpense/perDiemCompensation with body: \
-  {{"travelExpense":{{"id":TE_ID}},"location":"Oslo","overnightAccommodation":"HOTEL", \
-  "count":NUM_DAYS,"rateType":"TYPE","rateCategory":"CATEGORY"}} \
-  REQUIRED: location, overnightAccommodation (enum: "HOTEL", "NONE", "OTHER"). \
-  Valid fields: count (number of days), rateType, rateCategory. \
-  Do NOT include: countDays, startDate, endDate, numberOfNightsOnBoat, numberOfDays, rate. \
+  {{"travelExpense":{{"id":TE_ID}},"location":"Oslo","overnightAccommodation":"HOTEL","count":NUM_DAYS}} \
+  REQUIRED: location, overnightAccommodation (enum: "NONE", "HOTEL", "BOARDING_HOUSE_WITHOUT_COOKING", "BOARDING_HOUSE_WITH_COOKING"). \
+  Valid fields: count (int, number of days), rate (number), amount (number). \
+  rateType and rateCategory are OBJECT refs {{"id":X}} — GET /travelExpense/rateCategory first if needed. \
+  Do NOT include: countDays, startDate, endDate, numberOfNightsOnBoat, numberOfDays. \
   If per diem fails: record the amount as a voucher (Debit 7160, Credit 2910).
 • Delete: GET /travelExpense → DELETE /travelExpense/{{id}}.
 • List fields: only use "id,employee,status" — travelToDate/travelFromDate do NOT exist.

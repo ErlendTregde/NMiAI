@@ -1071,11 +1071,16 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_travel_expense":
-            # Include typeOfTravel=DOMESTIC to create a "reiseregning" (not "ansattutlegg")
+            # Include travelDetails to create a "reiseregning" (not "ansattutlegg")
             # Per diem compensation only works on reiseregning type
+            # typeOfTravel does NOT exist on the DTO — travelDetails is what sets the type
             return client.post("/travelExpense", {
                 "employee": {"id": args["employee_id"]},
-                "typeOfTravel": "DOMESTIC",
+                "travelDetails": {
+                    "isForeignTravel": False,
+                    "isDayTrip": False,
+                    "isCompensationFromRates": True,
+                },
             })
 
         case "tripletex_delete_travel_expense":
@@ -1428,6 +1433,14 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 # Strip fields that don't exist
                 for bad_field in ("name", "title", "amount"):
                     body.pop(bad_field, None)
+                # Fix currency — strip if just {"code": "NOK"} (defaults to NOK anyway)
+                # Sending {"code": "NOK"} without factor causes "currency.factor: Må være minimum 1"
+                curr = body.get("currency")
+                if isinstance(curr, dict) and curr.get("code", "").upper() == "NOK" and "id" not in curr:
+                    body.pop("currency")
+                # amountCurrencyIncVat is REQUIRED — auto-fill from amountNOKInclVAT if missing
+                if "amountCurrencyIncVat" not in body and "amountNOKInclVAT" in body:
+                    body["amountCurrencyIncVat"] = body["amountNOKInclVAT"]
 
             # Intercept POST /travelExpense/perDiemCompensation — fix field names
             # Schema: travelExpense, rateType, rateCategory, countryCode, travelExpenseZoneId,
@@ -1445,6 +1458,17 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 for bad_field in ("startDate", "endDate", "numberOfNightsOnBoat",
                                   "description", "name", "title"):
                     body.pop(bad_field, None)
+
+            # Intercept POST /travelExpense — ensure travelDetails for reiseregning
+            if method == "POST" and path.rstrip("/") == "/travelExpense":
+                for bad_field in ("typeOfTravel", "travelType", "type", "description"):
+                    body.pop(bad_field, None)
+                if "travelDetails" not in body:
+                    body["travelDetails"] = {
+                        "isForeignTravel": False,
+                        "isDayTrip": False,
+                        "isCompensationFromRates": True,
+                    }
 
             # Intercept POST /salary/transaction — auto-fix division on employment
             if method == "POST" and path.rstrip("/") == "/salary/transaction":
