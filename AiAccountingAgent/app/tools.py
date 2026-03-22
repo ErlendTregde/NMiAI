@@ -1071,8 +1071,11 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             })
 
         case "tripletex_create_travel_expense":
+            # Include typeOfTravel=DOMESTIC to create a "reiseregning" (not "ansattutlegg")
+            # Per diem compensation only works on reiseregning type
             return client.post("/travelExpense", {
                 "employee": {"id": args["employee_id"]},
+                "typeOfTravel": "DOMESTIC",
             })
 
         case "tripletex_delete_travel_expense":
@@ -1386,6 +1389,19 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 occ = body.get("occupationCode")
                 if occ is not None and not isinstance(occ, dict):
                     body.pop("occupationCode", None)  # Strip invalid type
+
+            # Intercept POST /travelExpense/cost — strip invalid fields
+            if method == "POST" and "/travelExpense/cost" in path:
+                # 'description' does NOT exist on the cost DTO
+                for bad_field in ("description", "name", "comment"):
+                    body.pop(bad_field, None)
+
+            # Intercept POST /travelExpense/perDiemCompensation — strip invalid fields
+            if method == "POST" and "/travelExpense/perDiemCompensation" in path:
+                # These fields do NOT exist on the perDiemCompensation DTO
+                for bad_field in ("countDays", "startDate", "endDate", "numberOfNightsOnBoat",
+                                  "description", "numberOfDays", "days"):
+                    body.pop(bad_field, None)
 
             # Intercept POST /salary/transaction — auto-fix division on employment
             if method == "POST" and path.rstrip("/") == "/salary/transaction":

@@ -223,9 +223,20 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Always complete ALL steps described in the task — depreciation, accruals, reversals, etc.
 
 ═══ TRAVEL EXPENSES ═══
-• Create: tripletex_create_travel_expense(employee_id) — only employee_id on creation.
-• Sub-resource endpoints (/travelExpense/{{id}}/perDiemCompensation, /cost) may return 404. \
-  If they fail: just create the travel expense container — do NOT retry sub-resources.
+• Create: tripletex_create_travel_expense(employee_id) — creates a DOMESTIC travel report. \
+  The tool auto-sets typeOfTravel=DOMESTIC (required for per diem compensation).
+• Adding costs: tripletex_api_call POST /travelExpense/cost with body: \
+  {{"travelExpense":{{"id":TE_ID}},"currency":{{"code":"NOK"}},"costCategory":{{"id":CAT_ID}}, \
+  "paymentType":{{"id":PT_ID}},"amountNOKInclVAT":AMOUNT}} \
+  REQUIRED: paymentType (GET /travelExpense/paymentType to find IDs). \
+  REQUIRED: costCategory (GET /travelExpense/costCategory to find IDs — "Fly", "Taxi", etc.). \
+  Do NOT include: description, name, comment (none exist on cost DTO).
+• Per diem: POST /travelExpense/perDiemCompensation with body: \
+  {{"travelExpense":{{"id":TE_ID}},"location":"Oslo","overnightAccommodation":"HOTEL", \
+  "count":NUM_DAYS,"rate":RATE_PER_DAY}} \
+  REQUIRED: location, overnightAccommodation. \
+  Do NOT include: countDays, startDate, endDate, numberOfNightsOnBoat, numberOfDays (none exist). \
+  If per diem fails: record the amount as a voucher (Debit 7160, Credit 2910).
 • Delete: GET /travelExpense → DELETE /travelExpense/{{id}}.
 • List fields: only use "id,employee,status" — travelToDate/travelFromDate do NOT exist.
 
