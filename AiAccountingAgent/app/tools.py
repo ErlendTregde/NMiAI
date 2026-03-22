@@ -1300,34 +1300,22 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                         logger.info(f"Auto-renamed '{wrong_field}' → 'dimensionName' for accountingDimensionName")
                         break
 
-            # Intercept POST /ledger/accountingDimensionValue — fix field names
-            # The DTO uses "displayName" for the value name, and
-            # "accountingDimensionNameId" (integer) for the parent reference
+            # Intercept POST /ledger/accountingDimensionValue — fix value name field
+            # The DTO uses "displayName" for the value name.
+            # The parent reference field is NOT "accountingDimensionNameId" (causes 422).
+            # Let the model discover the correct parent field via GET first.
             if method == "POST" and path.rstrip("/") == "/ledger/accountingDimensionValue":
                 # Rename wrong value name fields to "displayName"
                 for wrong_field in ("name", "value", "label", "dimensionValue",
-                                    "dimensionName", "code", "description"):
+                                    "code", "description"):
                     if wrong_field in body and "displayName" not in body:
                         body["displayName"] = body.pop(wrong_field)
                         logger.info(f"Auto-renamed '{wrong_field}' → 'displayName' for accountingDimensionValue")
                         break
-                # Fix parent reference: convert object ref or raw field to integer ID
-                # Model often sends {"accountingDimensionName": {"id": X}} but field doesn't exist
-                adn = body.pop("accountingDimensionName", None)
-                if adn is not None and "accountingDimensionNameId" not in body:
-                    if isinstance(adn, dict) and "id" in adn:
-                        body["accountingDimensionNameId"] = adn["id"]
-                    elif isinstance(adn, (int, float)):
-                        body["accountingDimensionNameId"] = int(adn)
-                    logger.info("Auto-fixed parent ref → accountingDimensionNameId")
-                # Also try other wrong parent field names
-                for wrong_parent in ("dimensionId", "dimensionNameId", "dimension"):
-                    val = body.pop(wrong_parent, None)
-                    if val is not None and "accountingDimensionNameId" not in body:
-                        if isinstance(val, dict) and "id" in val:
-                            body["accountingDimensionNameId"] = val["id"]
-                        elif isinstance(val, (int, float)):
-                            body["accountingDimensionNameId"] = int(val)
+                # Strip known-bad parent reference fields that cause 422
+                for bad_parent in ("accountingDimensionNameId", "dimensionName",
+                                   "dimensionId", "dimensionNameId"):
+                    body.pop(bad_parent, None)
 
             # Intercept POST /ledger/voucher — auto-add row numbers to prevent
             # the "guiRow 0" 422 error that occurs when rows are missing.
@@ -1390,9 +1378,9 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
             if "/employment/details" in path:
                 if "positionPercentage" in body and "percentageOfFullTimeEquivalent" not in body:
                     body["percentageOfFullTimeEquivalent"] = body.pop("positionPercentage")
-                # Strip fields that don't belong on details endpoint
-                for bad_field in ("annualSalary", "positionCode", "hoursPerDay",
-                                  "department", "division"):
+                # Strip fields that don't belong or cause type errors on details endpoint
+                for bad_field in ("positionCode", "hoursPerDay",
+                                  "department", "division", "remunerationType"):
                     body.pop(bad_field, None)
                 # Fix occupationCode — must be object reference, not raw value
                 occ = body.get("occupationCode")

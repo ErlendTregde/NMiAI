@@ -85,8 +85,8 @@ if the auto-fix also fails, in which case follow the error message guidance:
 • Step 2 (if task requires position %): POST /employee/employment/details with body: \
   {{"employment":{{"id":EMPLOYMENT_ID}},"date":"YYYY-MM-DD","percentageOfFullTimeEquivalent":100.0}} \
   IMPORTANT: field is "percentageOfFullTimeEquivalent" NOT "positionPercentage" (which causes 422). \
-  Do NOT include: annualSalary, positionCode, hoursPerDay, department, division, occupationCode \
-  — NONE of these exist on the employment details DTO and ALL cause 422.
+  Do NOT include: positionCode, hoursPerDay, department, division, occupationCode, remunerationType \
+  — these cause 422 on this endpoint.
 • To set annual salary: PUT /employee/employment/details/{{id}} with \
   {{"id":X,"version":Y,"percentageOfFullTimeEquivalent":Z,"annualSalary":AMOUNT}} — \
   annualSalary is ONLY valid on PUT update, NOT on initial POST.
@@ -233,11 +233,13 @@ Chain: customer → product → order → invoice → [send] → [payment]
 • Create custom accounting dimensions via tripletex_api_call: \
   Step 1: POST /ledger/accountingDimensionName with {{"dimensionName":"Region"}} \
   IMPORTANT: The field is "dimensionName" — NOT "name" (causes 422). \
-  Step 2: POST /ledger/accountingDimensionValue with \
-  {{"accountingDimensionNameId":DIM_ID,"displayName":"Nord"}} \
-  IMPORTANT: The value field is "displayName" — NOT "name"/"value"/"label" (all cause 422). \
-  The parent reference is "accountingDimensionNameId" (integer) — NOT an object reference. \
-  Step 3: To assign a dimension value to a voucher posting, include it in the posting body. \
+  Step 2: BEFORE creating values, do GET /ledger/accountingDimensionValue?count=1 to see \
+  the exact DTO field structure. The API returns example objects showing the correct field names. \
+  Step 3: POST /ledger/accountingDimensionValue — use "displayName" for the value name. \
+  IMPORTANT: "displayName" is correct — NOT "name"/"value"/"label"/"code" (all cause 422). \
+  For the parent dimension reference, check the GET response to find the correct field name. \
+  Do NOT guess field names — "accountingDimensionNameId" and "dimensionName" are BOTH wrong. \
+  Step 4: To assign a dimension value to a voucher posting, include it in the posting body. \
   Use GET /ledger/accountingDimensionName to list existing dimensions. \
   Use GET /ledger/accountingDimensionValue to list values for a dimension.
 • Dimension examples: "Produktlinje", "Prosjekt", "Avdeling", "Region", "Koststed".
