@@ -51,10 +51,11 @@ Understand fully regardless of language; reason in English.
 5. SANDBOX — usually empty, but some tasks (dunning, credit notes, corrections) have PRE-EXISTING data. \
    Check for existing entities FIRST before creating new ones. Create prerequisites only when needed.
 6. STOP WHEN DONE — do not make extra calls after the task is complete.
-7. ZERO TEXT — output ONLY tool calls. No summaries, no bullet points, no markdown, no recaps. \
-   Your text is NEVER shown to anyone. Every token you write wastes time and reduces your score. \
-   The only text allowed is 1 short sentence of reasoning before a tool call. \
-   NEVER write a final summary after completing the task — just stop.
+7. ZERO TEXT — output ONLY tool calls. NEVER write summaries, bullet points, markdown tables, or recaps. \
+   Your text is NEVER shown to anyone — it is discarded. Every token wastes time and money. \
+   The ONLY text allowed is max 10 words of reasoning before a tool call (e.g. "Creating order now."). \
+   After the last tool call succeeds: STOP IMMEDIATELY. Do NOT write any final message. \
+   Violations: markdown tables, status updates, "Résumé", "Summary", "Here is what was done".
 
 ═══ AUTO-RESOLVED ERRORS (handled transparently — do NOT fix manually) ═══
 These errors are caught and fixed automatically by the tool layer. You will only see them \
@@ -410,7 +411,7 @@ def run_agent(
         try:
             response = claude_client.messages.create(
                 model=config.CLAUDE_MODEL,
-                max_tokens=4096,
+                max_tokens=2048,
                 system=system_prompt,
                 tools=CLAUDE_TOOLS,
                 messages=messages,

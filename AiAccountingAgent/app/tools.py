@@ -517,6 +517,11 @@ def _auto_fix_product_exists(client: TripletexClient, args: dict) -> Any | None:
 
 def _auto_create_project_manager(client: TripletexClient) -> int | None:
     """Create a default employee and grant project manager entitlements."""
+    # Return cached PM if already created this session
+    cached = getattr(client, "_cached_project_manager_id", None)
+    if cached:
+        logger.info(f"Reusing cached project manager (employee {cached})")
+        return cached
     try:
         # Try to find an existing employee first
         existing = client.get("/employee", params={"fields": "id,firstName", "count": 1})
@@ -558,6 +563,7 @@ def _auto_create_project_manager(client: TripletexClient) -> int | None:
                 pass  # May already be granted
 
         logger.info(f"Auto-created project manager (employee {emp_id})")
+        client._cached_project_manager_id = emp_id
         return emp_id
     except TripletexError as e:
         logger.warning(f"Failed to auto-create project manager: {e}")
@@ -650,29 +656,38 @@ def _auto_fix_salary_division(client: TripletexClient, body: dict) -> bool:
 
 
 def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
-    """Fix invoice 422 'bankkontonummer' by setting up company bank account."""
+    """Fix invoice 422 'bankkontonummer' by setting bank account on ledger account 1920."""
     if "bank_account" in client._auto_fix_attempted:
         raise TripletexError(
             422,
-            "STOP: Invoice creation PERMANENTLY blocked — company has no bank account and "
-            "it CANNOT be added (proxy blocks PUT /company). Do NOT retry invoice creation. "
-            "Do NOT try GET /company, /whoAmI, /employee/loggedInUser, or any other approach "
-            "to find/fix the company — NONE will work. Instead: complete ALL other parts of "
-            "the task (create customer, product, order, project, etc.) and STOP.",
+            "STOP: Invoice creation blocked — company has no bank account and auto-fix "
+            "already failed. Do NOT retry. Complete all other parts of the task and STOP.",
         )
     client._auto_fix_attempted.add("bank_account")
-    logger.info("Invoice blocked by missing bank account — attempting auto-setup")
+    logger.info("Invoice blocked by missing bank account — attempting auto-setup via ledger account 1920")
     try:
-        ent = client.get("/employee/entitlement", params={"fields": "id,customer", "count": 1})
-        company_id = ent["values"][0]["customer"]["id"]
-        company = client.get(f"/company/{company_id}", params={"fields": "id,version"})
-        version = company["value"]["version"]
-        client.put(f"/company/{company_id}", body={
-            "id": company_id,
-            "version": version,
+        # Find account 1920 (company bank account)
+        accts = client.get("/ledger/account", params={
+            "fields": "id,number,name,version,bankAccountNumber,isBankAccount",
+            "count": 1000,
+        })
+        acct_1920 = None
+        for a in (accts or {}).get("values", []):
+            if a.get("number") == 1920:
+                acct_1920 = a
+                break
+        if not acct_1920:
+            raise TripletexError(422, "Account 1920 not found")
+
+        # Set bank account number on ledger account 1920
+        client.put(f"/ledger/account/{acct_1920['id']}", body={
+            "id": acct_1920["id"],
+            "version": acct_1920.get("version", 0),
+            "isBankAccount": True,
             "bankAccountNumber": "12345678903",
         })
-        logger.info("Bank account set — retrying invoice creation")
+        logger.info("Bank account number set on account 1920 — retrying invoice creation")
+
         from datetime import date as _date, timedelta as _td
         invoice_date = args["invoiceDate"]
         due_date = args.get("invoiceDueDate") or (
@@ -687,11 +702,9 @@ def _auto_fix_invoice_bank(client: TripletexClient, args: dict) -> Any | None:
         logger.warning(f"Bank account auto-setup failed: {bank_exc}")
         raise TripletexError(
             422,
-            "STOP: Invoice creation PERMANENTLY blocked — company has no bank account and "
-            "it CANNOT be added (proxy blocks PUT /company). Do NOT retry invoice creation. "
-            "Do NOT try GET /company, /whoAmI, /employee/loggedInUser, or any other approach "
-            "to find/fix the company — NONE will work. Instead: complete ALL other parts of "
-            "the task (create customer, product, order, project, etc.) and STOP.",
+            "STOP: Invoice creation blocked — company has no bank account and auto-fix "
+            "failed. Do NOT retry. Do NOT try GET /company, /whoAmI, or any workaround. "
+            "Complete all other parts of the task and STOP.",
         )
 
 
