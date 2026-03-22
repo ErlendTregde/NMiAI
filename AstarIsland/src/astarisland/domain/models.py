@@ -199,7 +199,7 @@ class SubmissionResult(AstarBaseModel):
 
 
 class AnalysisResult(AstarBaseModel):
-    prediction: list[list[list[float]]]
+    prediction: list[list[list[float]]] | None = None
     ground_truth: list[list[list[float]]]
     score: float | None = None
     width: int = Field(ge=1)

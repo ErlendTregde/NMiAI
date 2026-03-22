@@ -40,7 +40,7 @@ def default_heuristic_calibration() -> dict[str, Any]:
             "dynamic_target_scale": 0.82,
             "settlement_uplift_scale": 1.24,
             "port_suppression_scale": 0.34,
-            "ruin_suppression_scale": 0.52,
+            "ruin_suppression_scale": 0.40,
             "stable_negative_threshold": 0.58,
             "growth_frontier_threshold": 0.46,
             "collapse_frontier_threshold": 0.35,
@@ -688,7 +688,7 @@ def _dynamic_split(
     collapse_advantage: float,
 ) -> np.ndarray:
     if regime == "growth_frontier":
-        base = np.array([0.82, 0.05, 0.13], dtype=float)
+        base = np.array([0.86, 0.05, 0.09], dtype=float)
     elif regime == "collapse_frontier":
         base = np.array([0.38, 0.05, 0.57], dtype=float)
     elif regime == "maritime_frontier":
@@ -720,7 +720,7 @@ def _dynamic_split(
     if feature.observed_port_rate < 0.01 and feature.port_pressure < 0.05 and not feature.base.initial_port:
         signal[1] = 0.30
     if feature.observed_ruin_rate < 0.01 and feature.collapse_pressure < 0.35:
-        signal[2] = 0.40
+        signal[2] = 0.30
     split = _normalize(base * signal)
     if observed_distribution is not None and float(observed_distribution[1:4].sum()) > 0.01:
         split = _blend_distributions(
@@ -793,7 +793,7 @@ def _apply_local_caps(
     ruin_supported = feature.observed_ruin_rate > 0.02 or feature.base.initial_terrain == 3 or feature.collapse_pressure > 0.55
     if not ruin_supported:
         before = float(adjusted[3])
-        adjusted = _cap_class_probability(adjusted, class_index=3, cap=0.08, recipients=[0, 1, 2, 4, 5])
+        adjusted = _cap_class_probability(adjusted, class_index=3, cap=0.05, recipients=[0, 1, 4, 5])
         suppression += max(0.0, before - float(adjusted[3]))
         if before > adjusted[3]:
             notes.append("unsupported Ruin cap")

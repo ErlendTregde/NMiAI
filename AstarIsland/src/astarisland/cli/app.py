@@ -14,6 +14,7 @@ from astarisland.application import (
     SubmissionWorkflow,
     append_experiment_entry,
 )
+from astarisland.application.solver import Solver
 from astarisland.domain.models import ExperimentEntry, RoundDetail
 from astarisland.infrastructure import AstarIslandApiClient, ArtifactStore, MarkdownExperimentLog, Settings
 
@@ -189,6 +190,40 @@ def submit(
     console.print(f"Submitted seeds {submitted} for round {round_id}.")
 
 
+@app.command("train")
+def train() -> None:
+    """Download ground truth from all completed rounds and compute optimal priors."""
+
+    settings = _settings()
+    _require_token(settings)
+
+    with AstarIslandApiClient(settings) as api_client:
+        from astarisland.application.solver import train_priors
+        result = train_priors(api_client, settings.data_dir)
+
+    console.print(f"Training complete: {result['groups']} prior groups from {len(result['rounds_included'])} rounds")
+
+
+@app.command("solve")
+def solve() -> None:
+    """One-shot solver: query the active round, build predictions, and submit all seeds."""
+
+    settings = _settings()
+    _require_token(settings)
+    store = _artifact_store(settings)
+
+    with AstarIslandApiClient(settings) as api_client:
+        workflow = RoundWorkflow(api_client, store)
+        summary, detail = workflow.get_active_round()
+        console.print(f"Solving round {summary.round_number} ({detail.id})")
+        console.print(f"Map: {detail.map_width}x{detail.map_height}, {detail.seeds_count} seeds")
+
+        solver = Solver(api_client, settings.data_dir)
+        submitted = solver.solve(detail)
+
+    console.print(f"Done! Submitted {len(submitted)} seeds for round {summary.round_number}.")
+
+
 @app.command("analyze")
 def analyze(round_id: str = typer.Option(..., "--round-id")) -> None:
     """Fetch post-round analysis payloads and learn reusable priors."""
@@ -223,6 +258,36 @@ def analyze(round_id: str = typer.Option(..., "--round-id")) -> None:
         ),
     )
     console.print(f"Analysis complete for round {round_id}. Average local score: {summary['average_score']:.3f}")
+
+
+@app.command("backtest")
+def backtest() -> None:
+    """Run leave-one-out backtest across all historical rounds to validate and tune α."""
+
+    settings = _settings()
+    _require_token(settings)
+
+    with AstarIslandApiClient(settings) as api_client:
+        from astarisland.application.solver import run_backtest
+        results = run_backtest(api_client, settings.data_dir)
+
+    if not results:
+        console.print("[red]Backtest failed — no trained priors found. Run 'train' first.[/red]")
+        return
+
+    console.print(f"\nBacktest complete across {results.get('num_rounds', '?')} rounds.")
+    if "all_scores" in results:
+        table = Table(title="Alpha Tuning Results")
+        table.add_column("alpha")
+        table.add_column("Avg Score")
+        for alpha, score in sorted(results["all_scores"].items(), key=lambda x: -x[1]):
+            table.add_row(str(alpha), f"{score:.2f}")
+        console.print(table)
+    if "v3_avg" in results:
+        console.print(f"v3 baseline (global avg prior, a=3): {results['v3_avg']:.2f}")
+    if "best_alpha" in results:
+        improvement = results["best_score"] - results.get("v3_avg", 0)
+        console.print(f"Best a: {results['best_alpha']} (avg score: {results['best_score']:.2f}, improvement: {improvement:+.2f})")
 
 
 def main() -> None:

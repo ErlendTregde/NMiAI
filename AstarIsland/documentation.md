@@ -407,6 +407,34 @@
 - Note: Fitted model artifacts saved under data/learned/frontier-model.joblib and data/learned/frontier-model-metadata.json
 - Note: Heuristic calibration artifacts saved under data/learned/heuristic-calibration.json and data/learned/heuristic-backtest-summary.json
 
+### 2026-03-21T17:40:29.644979+00:00 | observe | round 8f664aed-8839-4c85-bed0-77a2cac7c6f5
+- Hypothesis: Active-frontier coverage with exact repeats, positive follow-ups, and hard-negative checks should reduce false dynamic predictions while preserving dynamic-cell recall.
+- Query allocation: Phase A 20 / Phase B 20 / Phase C 10
+- Model version: v4-regime-calibrated-heuristic
+- Outcome: Executed 50 observations and saved raw payloads under data/rounds/8f664aed-8839-4c85-bed0-77a2cac7c6f5/observations/raw.
+- Score: pending
+- Do not repeat: Do not spend all adaptive windows on frontier-positive guesses; the fitted model also needs hard-negative evidence to suppress false dynamic mass.
+- Note: Observation summary saved under summaries/observation-run.md
+- Note: Window dynamics summaries saved under observations/window-dynamics.json
+
+### 2026-03-21T17:40:46.031119+00:00 | predict | round 8f664aed-8839-4c85-bed0-77a2cac7c6f5
+- Hypothesis: A regime-based heuristic should shrink total dynamic mass toward observed and learned targets while suppressing unsupported Port and Ruin mass.
+- Query allocation: Prediction uses all saved observations for the round.
+- Model version: v4-regime-calibrated-heuristic
+- Outcome: Built 5 calibrated prediction tensors.
+- Score: pending
+- Do not repeat: Do not let Port and Ruin absorb frontier mass without direct trade or collapse evidence.
+- Note: Prediction summary saved under summaries/prediction-summary.md
+
+### 2026-03-21T17:41:02.763718+00:00 | submit | round 8f664aed-8839-4c85-bed0-77a2cac7c6f5
+- Hypothesis: Manual submission after validation is safer than unattended writes to the competition API.
+- Query allocation: Submission only; no additional queries consumed.
+- Model version: v4-regime-calibrated-heuristic
+- Outcome: Submitted seeds [0, 1, 2, 3, 4].
+- Score: pending
+- Do not repeat: Do not call submit before confirming the intended seed set.
+- Note: Submission summary saved under summaries/submission-summary.md
+
 ## Mistakes To Avoid Repeating
 
 - Do not resubmit unvalidated tensors.
