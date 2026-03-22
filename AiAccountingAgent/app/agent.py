@@ -113,11 +113,13 @@ Chain: customer → product → order → invoice → [send] → [payment]
 ═══ SUPPLIERS ═══
 • Supplier ≠ Customer. "leverandør/fornecedor/fournisseur/Lieferant" → tripletex_create_supplier.
 • Supplier invoice ("leverandørfaktura/inngående faktura/factura del proveedor"): \
-  ALWAYS use tripletex_create_supplier_invoice — NOT tripletex_create_voucher. \
+  Try tripletex_create_supplier_invoice first. \
   Required: supplier_id, invoiceDate, amountCurrency (total WITH VAT). \
   NEVER include: dueDate, description, amountExcludingVatCurrency.
 • For NOK: omit currency_code. For foreign: set currency_code="EUR" etc.
-• If 500 persists: the tool auto-retries with minimal body. Do NOT retry manually.
+• If supplierInvoice returns 500: it will give you fallback instructions. \
+  Use tripletex_create_voucher instead: debit expense account (4300 goods, 6300 services, \
+  1200 assets), credit 2400 (leverandørgjeld/AP). Include VAT. Do NOT retry the endpoint.
 
 ═══ PROJECTS ═══
 • tripletex_create_project requires name + startDate. \

@@ -1058,14 +1058,19 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                 return client.post("/supplierInvoice", body)
             except TripletexError as exc:
                 if exc.status_code >= 500:
-                    # Retry with minimal body — some fields may cause 500
-                    logger.warning("Supplier invoice 500 — retrying with minimal body")
-                    minimal_body = {
-                        "invoiceDate": invoice_date,
-                        "supplier": {"id": args["supplier_id"]},
-                        "amountCurrency": args.get("amountCurrency"),
+                    # Endpoint is permanently broken — fail fast, no retries.
+                    # Guide model to use manual voucher as fallback.
+                    logger.warning("Supplier invoice 500 — returning voucher fallback guidance")
+                    return {
+                        "success": False,
+                        "error": (
+                            "supplierInvoice endpoint returned 500 (known issue). "
+                            "FALLBACK: Create a manual voucher instead with tripletex_create_voucher: "
+                            "debit the appropriate expense/asset account (e.g. 4300 for goods, "
+                            "6300 for services, 1200 for assets), credit 2400 (leverandørgjeld/AP). "
+                            "Amount should include VAT. Add supplier info in the description."
+                        ),
                     }
-                    return client.post("/supplierInvoice", minimal_body)
                 raise
 
         # ── Customers ─────────────────────────────────────────────────────────
@@ -1220,6 +1225,23 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
         case "tripletex_register_payment":
             if not args.get("paymentDate") or not args.get("amount"):
                 return {"success": False, "error": "Required: paymentDate (YYYY-MM-DD) and amount (number). paymentTypeId defaults to 1."}
+            # Pre-fetch payment type to avoid 404 + retry overhead
+            payment_type_id = args.get("paymentTypeId")
+            if not payment_type_id:
+                cached_id = getattr(client, "_cached_payment_type_id", None)
+                if cached_id:
+                    payment_type_id = cached_id
+                else:
+                    try:
+                        pt = client.get("/invoice/paymentType", params={"fields": "id", "count": 1})
+                        values = (pt or {}).get("values", [])
+                        if values:
+                            payment_type_id = values[0]["id"]
+                            client._cached_payment_type_id = payment_type_id
+                    except TripletexError:
+                        pass
+                if not payment_type_id:
+                    payment_type_id = 1
             # NOTE: /:payment is an action endpoint — uses query params, NOT JSON body
             try:
                 return client.put(
@@ -1227,7 +1249,7 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
                     params={
                         "paymentDate": args["paymentDate"],
                         "paidAmount": args["amount"],
-                        "paymentTypeId": args.get("paymentTypeId") or 1,
+                        "paymentTypeId": payment_type_id,
                     },
                 )
             except TripletexError as exc:
@@ -1408,7 +1430,8 @@ def _dispatch(client: TripletexClient, name: str, args: dict) -> Any:  # noqa: C
 
             # BLOCK POST /ledger/account — accounts are pre-populated in the
             # chart of accounts and must NEVER be created via the API.
-            if method == "POST" and "/ledger/account" in path:
+            # NOTE: exact match to avoid blocking /ledger/accountingDimensionName etc.
+            if method == "POST" and path.rstrip("/") == "/ledger/account":
                 raise TripletexError(
                     422,
                     "STOP: You must NEVER create ledger accounts. The chart of accounts is "
